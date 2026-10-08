@@ -1,0 +1,16 @@
+Readerka bundles open-source components:
+
+Kotlin, kotlinx.coroutines, kotlinx.serialization and AndroidX (Compose, Room,
+Lifecycle and DataStore): Apache License 2.0.
+Sources: https://github.com/JetBrains/kotlin and
+https://android.googlesource.com/platform/frameworks/support
+
+PDFBox Android 2.0.27.0, Copyright Tom Roush and contributors.
+Apache PDFBox, Copyright The Apache Software Foundation.
+Source: https://github.com/TomRoush/PdfBox-Android
+License: Apache License 2.0. See licenses/Apache-2.0.txt and
+licenses/PDFBox-NOTICE.txt.
+
+Bouncy Castle 1.72, Copyright The Legion of the Bouncy Castle Inc.
+Source: https://www.bouncycastle.org/
+License: see licenses/Bouncy-Castle.txt.

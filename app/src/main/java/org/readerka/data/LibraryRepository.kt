@@ -1,0 +1,86 @@
+package org.readerka.data
+
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.room.withTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import org.readerka.pdf.PdfEngine
+import java.io.File
+import java.util.UUID
+
+class LibraryRepository(val context: Context, val database: LibraryDatabase, pdfRoot: File = File(context.filesDir, "pdfs")) {
+    val dao = database.dao()
+    val pdfDirectory = pdfRoot.apply { mkdirs() }
+    val snapshots = database.invalidationTracker.createFlow(
+        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks"
+    ).map { dao.snapshot() }
+    fun pdfFile(document: Document): File {
+        require(document.storedName.matches(Regex("[A-Za-z0-9_-]+\\.pdf"))) { "Unsafe PDF name" }
+        return File(pdfDirectory, document.storedName)
+    }
+    suspend fun importPdf(uri: Uri, folderId: String?): Document = withContext(Dispatchers.IO) {
+        val id = UUID.randomUUID().toString()
+        var name = if (uri.scheme == "file") File(uri.path.orEmpty()).name.ifBlank { "document.pdf" } else "document.pdf"
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) name = c.getString(0) ?: name
+        }
+        val pending = File(pdfDirectory, "$id.part")
+        val file = File(pdfDirectory, "$id.pdf")
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input -> pending.outputStream().use { output ->
+                val buffer = ByteArray(64 * 1024); var total = 0L
+                while (true) { val n = input.read(buffer); if (n < 0) break; total += n; require(total <= 1024L * 1024 * 1024) { "PDF exceeds 1 GiB" }; output.write(buffer, 0, n) }
+            } } ?: error("Cannot open selected PDF")
+            val pages = PdfEngine(pending, context.cacheDir).use { it.pageCount }
+            require(pending.renameTo(file)) { "Cannot save PDF" }
+            val document = Document(id, name.substringBeforeLast('.'), name, file.name, folderId, pageCount = pages)
+            dao.putDocument(document); document
+        } catch (e: Exception) { pending.delete(); file.delete(); throw e }
+    }
+    suspend fun saveEntry(entry: Entry, tagNames: String, collectionIds: Set<String>) = database.withTransaction {
+        dao.putEntry(entry.copy(updatedAt = System.currentTimeMillis()))
+        dao.clearEntryTags(entry.id)
+        for (tag in resolveTags(tagNames)) dao.putEntryTag(EntryTag(entry.id, tag.id))
+        dao.clearMemberships(entry.id)
+        for (id in collectionIds) dao.putMembership(Membership(id, entry.id))
+    }
+    suspend fun saveDocument(document: Document, tagNames: String) = database.withTransaction {
+        dao.putDocument(document); dao.clearDocumentTags(document.id)
+        for (tag in resolveTags(tagNames)) dao.putDocumentTag(DocumentTag(document.id, tag.id))
+    }
+    private suspend fun resolveTags(names: String): List<Tag> {
+        val existing = dao.allTags().associateBy { it.name }
+        return names.split(',', '\n').map { it.trim().removePrefix("#") }.filter { it.isNotBlank() }.distinct().map {
+            existing[it] ?: Tag(UUID.randomUUID().toString(), it).also { tag -> dao.putTag(tag) }
+        }
+    }
+    suspend fun batch(ids: Set<String>, color: Marker? = null, type: NoteType? = null, tags: String? = null, collection: String? = null) = database.withTransaction {
+        for (e in dao.allEntries().filter { it.id in ids }) {
+            if (color != null || type != null) dao.putEntry(e.copy(color = color ?: e.color, type = type ?: e.type, updatedAt = System.currentTimeMillis()))
+            if (collection != null) dao.putMembership(Membership(collection, e.id))
+            if (tags != null) for (tag in resolveTags(tags)) dao.putEntryTag(EntryTag(e.id, tag.id))
+        }
+    }
+    suspend fun saveFolder(folder: DocumentFolder) = database.withTransaction {
+        val values = dao.allDocumentFolders().filterNot { it.id == folder.id } + folder
+        FolderTree.validate(values.map { it.id to it.parentId }); require(folder.name.isNotBlank()); dao.putFolder(folder)
+    }
+    suspend fun saveCollection(collection: Collection) = database.withTransaction {
+        val values = dao.allCollections().filterNot { it.id == collection.id } + collection
+        FolderTree.validate(values.map { it.id to it.parentId }); require(collection.name.isNotBlank()); dao.putCollection(collection)
+    }
+    suspend fun renameTag(id: String, name: String) = database.withTransaction {
+        val normalized = name.trim().removePrefix("#")
+        require(normalized.isNotBlank())
+        val other = dao.allTags().firstOrNull { it.name == normalized && it.id != id }
+        if (other == null) dao.renameTag(id, normalized)
+        else {
+            dao.allEntryTags().filter { it.tagId == id }.forEach { dao.putEntryTag(it.copy(tagId = other.id)) }
+            dao.allDocumentTags().filter { it.tagId == id }.forEach { dao.putDocumentTag(it.copy(tagId = other.id)) }
+            dao.deleteTag(id)
+        }
+    }
+}
