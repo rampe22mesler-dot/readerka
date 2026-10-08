@@ -1,0 +1,5 @@
+org.readerka.ReaderControlsTest:.
+
+Time: 74.377
+
+OK (1 test)

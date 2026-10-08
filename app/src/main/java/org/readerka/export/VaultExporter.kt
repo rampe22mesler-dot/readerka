@@ -51,12 +51,23 @@ class VaultExporter {
             if (desiredPdfPaths.values.count { it.equals(path, ignoreCase = true) } > 1)
                 path.dropLast(4) + " — ${safeName(id)}.pdf" else path
         }
+        val readerFolders = data.readerFolders.associate { it.id to (it.name to it.parentId) }
+        val readerPaths = data.readerFolders.associate { f ->
+            val section = if (f.kind == ReaderFolderKind.Quotes) "Цитаты" else "Закладки"
+            f.id to "Структура PDF/" + stableName(docs.getValue(f.documentId).title, f.documentId) + "/" + section + "/" + folderPath(f.id, readerFolders)
+        }
+        val bookmarkNames = data.bookmarks.associate { it.id to (it.title to it.parentId) }
+        val bookmarkPaths = data.bookmarks.associate { b ->
+            val base = "Закладки/" + stableName(docs.getValue(b.documentId).title, b.documentId) + "/"
+            val folder = folderPath(b.folderId, readerFolders).let { if (it.isEmpty()) "" else "$it/" }
+            b.id to base + folder + folderPath(b.id, bookmarkNames) + ".md"
+        }
         val tags = data.tags.associateBy { it.id }
         val available = mutableSetOf<String>()
         val missing = mutableListOf<String>()
         val written = mutableSetOf<String>()
         var done = 0
-        val total = data.documents.size * 2 + data.entries.size + data.collections.size + data.memberships.size + data.bookmarks.size + 1
+        val total = data.documents.size * 2 + data.entries.size + data.collections.size + data.memberships.size + data.bookmarks.size + data.readerFolders.size + 1
         ZipOutputStream(output.buffered()).use { zip ->
             fun text(path: String, content: String) {
                 require(written.add(path)) { "Duplicate export path: $path" }
@@ -100,6 +111,8 @@ class VaultExporter {
                 text(notePaths.getValue(e.id), buildString {
                     append("---\nid: ${yaml(e.id)}\ntype: ${yaml(if (e.type == NoteType.GeneralNote) "General Note" else e.type.name)}\ncolor: ${yaml(e.color.name.lowercase())}\n")
                     append("tags: ${Json.encodeToString(entryTags)}\ncollections: ${Json.encodeToString(memberPaths)}\n")
+                    val internalPaths = data.readerMemberships.filter { it.entryId == e.id }.map { readerPaths.getValue(it.folderId) }
+                    append("reader_folders: ${Json.encodeToString(internalPaths)}\n")
                     append("created_at: ${yaml(Instant.ofEpochMilli(e.createdAt).toString())}\nupdated_at: ${yaml(Instant.ofEpochMilli(e.updatedAt).toString())}\n")
                     if (d != null) {
                         append("source_pdf: ${yaml(d.originalName)}\nsource_title: ${yaml(d.title)}\n")
@@ -130,7 +143,16 @@ class VaultExporter {
             }
             for (b in data.bookmarks) {
                 val d = docs.getValue(b.documentId)
-                text("Закладки/${stableName(b.title, b.id)}.md", "---\nid: ${yaml(b.id)}\nsource_pdf: ${yaml(d.originalName)}\nsource_page: ${b.page + 1}\n---\n# ${heading(b.title)}\n\n${md(b.comment)}\n\n${pdfLink(d, b.page)}\n\n${wiki(sourcePaths.getValue(d.id))}\n")
+                text(bookmarkPaths.getValue(b.id), "---\nid: ${yaml(b.id)}\nsource_pdf: ${yaml(d.originalName)}\nsource_page: ${b.page + 1}\nparent_id: ${yaml(b.parentId.orEmpty())}\nreader_offset: ${b.offset}\n---\n# ${heading(b.title)}\n\n${md(b.comment)}\n\n${pdfLink(d, b.page)}\n\n${wiki(sourcePaths.getValue(d.id))}\n")
+            }
+            for (f in data.readerFolders) {
+                val path = readerPaths.getValue(f.id)
+                directory(path)
+                val links = if (f.kind == ReaderFolderKind.Quotes)
+                    data.readerMemberships.filter { it.folderId == f.id }.map { notePaths.getValue(it.entryId) }
+                else data.bookmarks.filter { it.folderId == f.id }.map { bookmarkPaths.getValue(it.id) }
+                val children = data.readerFolders.filter { it.parentId == f.id }.map { readerPaths.getValue(it.id) + "/_Папка.md" }
+                text("$path/_Папка.md", "# ${heading(f.name)}\n\n" + (links + children).joinToString("\n") { "- ${wiki(it)}" } + "\n")
             }
             text("_Содержание.md", buildString {
                 append("# Readerka Vault\n\nОдносторонний снимок библиотеки. Основной текст каждой записи находится только в «Заметки». В папках коллекций — ссылки и встраивания этих записей. Изменения в Vault не возвращаются в Readerka.\n\n## Источники\n")

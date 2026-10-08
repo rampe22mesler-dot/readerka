@@ -20,6 +20,7 @@ class RestoreService(private val repository: LibraryRepository) {
                 checkConflicts(current.documents, s.documents) { it.id }; checkConflicts(current.entries, s.entries) { it.id }
                 checkConflicts(current.documentFolders, s.documentFolders) { it.id }; checkConflicts(current.collections, s.collections) { it.id }
                 checkConflicts(current.tags, s.tags) { it.id }; checkConflicts(current.bookmarks, s.bookmarks) { it.id }
+                checkConflicts(current.readerFolders, s.readerFolders) { it.id }
                 require(s.tags.none { t -> current.tags.any { it.name == t.name && it.id != t.id } }) { "Conflicting tag identity" }
                 fun hash(file: File): ByteArray = file.inputStream().use { input ->
                     val md = MessageDigest.getInstance("SHA-256"); val buffer = ByteArray(65536)
@@ -38,10 +39,13 @@ class RestoreService(private val repository: LibraryRepository) {
                 val dao = repository.dao
                 FolderTree.ordered(s.documentFolders, { it.id }, { it.parentId }).forEach { dao.putFolder(it) }
                 FolderTree.ordered(s.collections, { it.id }, { it.parentId }).forEach { dao.putCollection(it) }
-                s.documents.forEach { dao.putDocument(it) }; s.entries.forEach { dao.putEntry(it) }
+                s.documents.forEach { dao.putDocument(it) }
+                FolderTree.ordered(s.readerFolders, { it.id }, { it.parentId }).forEach { dao.putReaderFolder(it) }
+                s.entries.forEach { dao.putEntry(it) }
                 s.tags.forEach { dao.putTag(it) }; s.memberships.forEach { dao.putMembership(it) }
                 s.entryTags.forEach { dao.putEntryTag(it) }; s.documentTags.forEach { dao.putDocumentTag(it) }
-                s.bookmarks.forEach { dao.putBookmark(it) }
+                s.readerMemberships.forEach { dao.putReaderMembership(it) }
+                FolderTree.ordered(s.bookmarks, { it.id }, { it.parentId }).forEach { dao.putBookmark(it) }
             }
         } catch (e: Exception) { createdFiles.forEach { it.delete() }; throw e }
         finally { staged.directory.deleteRecursively() }

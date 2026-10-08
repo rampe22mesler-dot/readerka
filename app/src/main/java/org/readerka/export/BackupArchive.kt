@@ -9,11 +9,11 @@ import java.security.MessageDigest
 import java.util.zip.*
 
 @Serializable
-data class BackupManifest(val version: Int = 1, val sha256: Map<String, String>)
+data class BackupManifest(val version: Int = 2, val sha256: Map<String, String>)
 data class StagedBackup(val data: LibrarySnapshot, val directory: File)
 
 object BackupArchive {
-    private val json = Json { prettyPrint = true }
+    private val json = Json { prettyPrint = true; encodeDefaults = true }
     private fun digest(file: File) = file.inputStream().use { input ->
         val md = MessageDigest.getInstance("SHA-256"); val buffer = ByteArray(64 * 1024)
         while (true) { val n = input.read(buffer); if (n < 0) break; md.update(buffer, 0, n) }
@@ -54,7 +54,7 @@ object BackupArchive {
                 }
             }
             val manifest = json.decodeFromString<BackupManifest>(File(directory, "manifest.json").readText())
-            require(manifest.version == 1) { "Unsupported backup version" }
+            require(manifest.version in 1..2) { "Unsupported backup version" }
             require(seen == manifest.sha256.keys + "manifest.json") { "Incomplete backup" }
             for ((name, hash) in manifest.sha256) require(digest(File(directory, name)) == hash) { "Checksum mismatch" }
             val data = json.decodeFromString<LibrarySnapshot>(File(directory, "library.json").readText())
@@ -64,11 +64,13 @@ object BackupArchive {
         } catch (e: Exception) { directory.deleteRecursively(); throw e }
     }
     fun validate(s: LibrarySnapshot) {
-        require(s.version == 1)
+        require(s.version in 1..2)
         fun ids(values: List<String>): Set<String> { require(values.all { it.isNotBlank() } && values.distinct().size == values.size); return values.toSet() }
         val docIds = ids(s.documents.map { it.id }); val entryIds = ids(s.entries.map { it.id })
         val collectionIds = ids(s.collections.map { it.id }); val folderIds = ids(s.documentFolders.map { it.id }); val tagIds = ids(s.tags.map { it.id })
         ids(s.bookmarks.map { it.id })
+        ids(s.readerFolders.map { it.id })
+        ReaderStructure.validate(s.readerFolders, s.readerMemberships, s.bookmarks, s.entries, docIds)
         require(s.documents.map { it.storedName }.distinct().size == s.documents.size)
         require(s.tags.map { it.name }.distinct().size == s.tags.size)
         FolderTree.validate(s.documentFolders.map { it.id to it.parentId }); FolderTree.validate(s.collections.map { it.id to it.parentId })

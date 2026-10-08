@@ -33,7 +33,7 @@ class BackupArchiveTest {
             }
             for ((i, bad) in listOf(
                 archive(mapOf("../escape" to "bad")),
-                archive(mapOf("manifest.json" to "{\"version\":2,\"sha256\":{}}")),
+                archive(mapOf("manifest.json" to "{\"version\":99,\"sha256\":{}}")),
                 archive(mapOf("manifest.json" to "{\"version\":1,\"sha256\":{\"library.json\":\"incorrect\"}}", "library.json" to "{}"))
             ).withIndex()) {
                 val dir = File(temp, "restore$i")

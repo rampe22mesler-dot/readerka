@@ -5,6 +5,7 @@ import android.graphics.*
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.KeyEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewConfiguration
@@ -20,6 +21,8 @@ class PdfPageView(context: Context) : View(context) {
         set(value) { field = value; invalidate() }
     var onSelection: (String, Anchor) -> Unit = { _, _ -> }
     var onHighlight: (Entry) -> Unit = {}
+    var onCenterTap: () -> Unit = {}
+    var onNavigationKey: (KeyEvent) -> Boolean = { false }
     var zoom = 1f
         private set
     private var panX = 0f
@@ -60,13 +63,20 @@ class PdfPageView(context: Context) : View(context) {
             return true
         }
     })
-    init { isClickable = true; isFocusable = true }
+    init { isClickable = true; isFocusable = true; isFocusableInTouchMode = true; setOnKeyListener { _, _, event -> onNavigationKey(event) } }
     fun clearSelection() { startGlyph = null; endGlyph = null; cachedSelection = null; selecting = false; invalidate() }
+    fun reset() { handler.removeCallbacksAndMessages(null); parent?.requestDisallowInterceptTouchEvent(false); clearSelection(); fitWidth(); bitmap = null; pageText = null; highlights = emptyList() }
     fun fitWidth() { zoom = 1f; panX = 0f; panY = 0f; invalidate() }
     fun setZoom(value: Float) { zoom = value.coerceIn(1f, 5f); clampPan(); invalidate() }
     private fun clampPan() {
         panX = panX.coerceIn(width * (1f - zoom), 0f)
         panY = panY.coerceIn(height * (1f - zoom), 0f)
+    }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (oldw > 0) panX *= w.toFloat() / oldw
+        if (oldh > 0) panY *= h.toFloat() / oldh
+        clampPan(); invalidate()
     }
     fun screenRect(rect: org.readerka.data.PageRect) = RectF(
         panX + rect.left * width * zoom, panY + rect.top * height * zoom,
@@ -85,6 +95,7 @@ class PdfPageView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(Color.WHITE)
+        paint.alpha = 255
         bitmap?.let { drawingRect.set(panX, panY, panX + width * zoom, panY + height * zoom); canvas.drawBitmap(it, null, drawingRect, paint) }
         for (entry in highlights) {
             paint.color = entry.color.argb.toInt(); paint.alpha = 95
@@ -133,7 +144,9 @@ class PdfPageView(context: Context) : View(context) {
                 else if (kotlin.math.hypot(event.x - downX, event.y - downY) < slop) {
                     val nx = (event.x - panX) / (width * zoom)
                     val ny = (event.y - panY) / (height * zoom)
-                    highlights.lastOrNull { e -> e.anchor?.rects?.any { it.contains(nx, ny) } == true }?.let(onHighlight)
+                    val highlighted = highlights.lastOrNull { e -> e.anchor?.rects?.any { it.contains(nx, ny) } == true }
+                    if (highlighted != null) onHighlight(highlighted)
+                    else if (nx in .25f.. .75f) onCenterTap()
                     performClick()
                 }
                 selecting = false; parent?.requestDisallowInterceptTouchEvent(false)

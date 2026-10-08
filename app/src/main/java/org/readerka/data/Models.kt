@@ -76,15 +76,37 @@ data class EntryTag(val entryId: String, val tagId: String)
 data class DocumentTag(val documentId: String, val tagId: String)
 
 @Serializable
-@Entity(tableName = "bookmarks", foreignKeys = [ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE)], indices = [Index("documentId")])
-data class Bookmark(@PrimaryKey val id: String, val documentId: String, val page: Int, val title: String, val comment: String = "")
+@Entity(tableName = "bookmarks", foreignKeys = [
+    ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE),
+    ForeignKey(entity = Bookmark::class, parentColumns = ["id"], childColumns = ["parentId"], onDelete = ForeignKey.SET_NULL),
+    ForeignKey(entity = ReaderFolder::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.SET_NULL)
+], indices = [Index("documentId"), Index("parentId"), Index("folderId")])
+data class Bookmark(@PrimaryKey val id: String, val documentId: String, val page: Int, val title: String, val comment: String = "",
+    val parentId: String? = null, val folderId: String? = null, @ColumnInfo(defaultValue = "0") val offset: Int = 0)
+
+@Serializable enum class ReaderFolderKind { Quotes, Bookmarks }
+
+@Serializable
+@Entity(tableName = "reader_folders", foreignKeys = [
+    ForeignKey(entity = Document::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE),
+    ForeignKey(entity = ReaderFolder::class, parentColumns = ["id"], childColumns = ["parentId"], onDelete = ForeignKey.SET_NULL)
+], indices = [Index("documentId"), Index("parentId")])
+data class ReaderFolder(@PrimaryKey val id: String, val documentId: String, val kind: ReaderFolderKind, val name: String, val parentId: String? = null)
+
+@Serializable
+@Entity(tableName = "reader_memberships", primaryKeys = ["folderId", "entryId"], foreignKeys = [
+    ForeignKey(entity = ReaderFolder::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE),
+    ForeignKey(entity = Entry::class, parentColumns = ["id"], childColumns = ["entryId"], onDelete = ForeignKey.CASCADE)
+], indices = [Index("entryId")])
+data class ReaderMembership(val folderId: String, val entryId: String)
 
 @Serializable
 data class LibrarySnapshot(
-    val version: Int = 1, val documents: List<Document> = emptyList(), val documentFolders: List<DocumentFolder> = emptyList(),
+    val version: Int = 2, val documents: List<Document> = emptyList(), val documentFolders: List<DocumentFolder> = emptyList(),
     val entries: List<Entry> = emptyList(), val collections: List<Collection> = emptyList(),
     val memberships: List<Membership> = emptyList(), val tags: List<Tag> = emptyList(),
-    val entryTags: List<EntryTag> = emptyList(), val documentTags: List<DocumentTag> = emptyList(), val bookmarks: List<Bookmark> = emptyList()
+    val entryTags: List<EntryTag> = emptyList(), val documentTags: List<DocumentTag> = emptyList(), val bookmarks: List<Bookmark> = emptyList(),
+    val readerFolders: List<ReaderFolder> = emptyList(), val readerMemberships: List<ReaderMembership> = emptyList()
 )
 
 class Converters {
@@ -94,4 +116,6 @@ class Converters {
     @TypeConverter fun stringToType(value: String) = NoteType.valueOf(value)
     @TypeConverter fun colorToString(value: Marker) = value.name
     @TypeConverter fun stringToColor(value: String) = Marker.valueOf(value)
+    @TypeConverter fun readerKindToString(value: ReaderFolderKind) = value.name
+    @TypeConverter fun stringToReaderKind(value: String) = ReaderFolderKind.valueOf(value)
 }

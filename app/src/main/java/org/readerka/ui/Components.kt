@@ -66,7 +66,7 @@ fun NoteSort.labelId() = when (this) {
 
 @Composable fun Confirm(title: Int, body: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(title)) }, text = { Text(stringResource(body)) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.delete)) } },
+        confirmButton = { TextButton(onClick = onConfirm, modifier = Modifier.testTag("confirm-delete")) { Text(stringResource(R.string.delete)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }
 
@@ -109,13 +109,16 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
     if (delete) Confirm(R.string.delete_folder_title, R.string.delete_folder_body, { delete = false }, { initial?.let { onDelete(it.id) }; onDismiss() })
 }
 
-@Composable fun EntryEditor(entry: Entry, data: LibrarySnapshot, onDismiss: () -> Unit, onSave: (Entry, String, Set<String>) -> Unit) {
+@Composable fun EntryEditor(entry: Entry, data: LibrarySnapshot, onDismiss: () -> Unit, onSave: (Entry, String, Set<String>, Set<String>) -> Unit, onDelete: (() -> Unit)? = null) {
     var title by remember(entry.id) { mutableStateOf(entry.title) }
     var comment by remember(entry.id) { mutableStateOf(entry.comment) }
     var type by remember(entry.id) { mutableStateOf(entry.type) }
     var color by remember(entry.id) { mutableStateOf(entry.color) }
     var tags by remember(entry.id) { mutableStateOf(data.entryTags.filter { it.entryId == entry.id }.mapNotNull { a -> data.tags.firstOrNull { it.id == a.tagId }?.name }.joinToString(", ")) }
     var members by remember(entry.id) { mutableStateOf(data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet()) }
+    var readerMembers by remember(entry.id) { mutableStateOf(data.readerMemberships.filter { it.entryId == entry.id }.map { it.folderId }.toSet()) }
+    var delete by remember { mutableStateOf(false) }
+    val readerFolders = data.readerFolders.filter { it.documentId == entry.documentId && it.kind == ReaderFolderKind.Quotes }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(if (entry.anchor == null) R.string.standalone_note else R.string.highlights)) },
         text = { Column(Modifier.fillMaxWidth().heightIn(max = 550.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(title, { title = it }, label = { Text(stringResource(R.string.title)) }, modifier = Modifier.fillMaxWidth().testTag("entry-title"))
@@ -128,6 +131,16 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
             Choice(stringResource(R.string.type), type, NoteType.entries, { stringResource(it.labelId()) }, { type = it })
             ColorPalette(color) { color = it }
             OutlinedTextField(tags, { tags = it }, label = { Text(stringResource(R.string.tags)) }, modifier = Modifier.fillMaxWidth().testTag("entry-tags"))
+            if (entry.documentId != null) {
+                Text(stringResource(R.string.folders_in_pdf), style = MaterialTheme.typography.labelLarge)
+                if (readerFolders.isEmpty()) Text(stringResource(R.string.create_folders_in_reader))
+                for (f in FolderTree.ordered(readerFolders, { it.id }, { it.parentId })) {
+                    Row(Modifier.fillMaxWidth().clickable { readerMembers = if (f.id in readerMembers) readerMembers - f.id else readerMembers + f.id }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(f.id in readerMembers, { checked -> readerMembers = if (checked) readerMembers + f.id else readerMembers - f.id })
+                        Text("  ".repeat(FolderTree.depth(f.id, readerFolders.map { it.id to it.parentId })) + f.name)
+                    }
+                }
+            }
             Text(stringResource(R.string.collections), style = MaterialTheme.typography.labelLarge)
             if (data.collections.isEmpty()) Text(stringResource(R.string.empty_folders))
             for (c in FolderTree.ordered(data.collections, { it.id }, { it.parentId })) {
@@ -137,8 +150,12 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
                 }
             }
         } },
-        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(entry.copy(title = title.trim(), comment = comment, type = type, color = color), tags, members); onDismiss() }) { Text(stringResource(R.string.save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
+        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(entry.copy(title = title.trim(), comment = comment, type = type, color = color), tags, members, readerMembers); onDismiss() }) { Text(stringResource(R.string.save)) } },
+        dismissButton = { Row {
+            if (onDelete != null) TextButton(onClick = { delete = true }, modifier = Modifier.testTag("delete-quote")) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        } })
+    if (delete) Confirm(R.string.delete_entries_title, R.string.delete_entries_body, { delete = false }, { onDelete?.invoke(); onDismiss() })
 }
 
 @Composable fun DocumentEditor(document: Document, data: LibrarySnapshot, onDismiss: () -> Unit, onSave: (Document, String) -> Unit) {

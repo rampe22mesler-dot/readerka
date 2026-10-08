@@ -55,8 +55,14 @@ class PdfEngine(file: File, cache: File) : Closeable {
     private val pdf = PDDocument.load(file, MemoryUsageSetting.setupMixed(16L * 1024 * 1024).setTempDir(cache))
     private val descriptor: ParcelFileDescriptor
     private val renderer: PdfRenderer
-    private var closed = false
-    val pageCount: Int get() = pdf.numberOfPages
+    @Volatile private var closed = false
+    private val rendererLock = Any()
+    private val textLock = Any()
+    private val sizes = mutableMapOf<Int, Pair<Int, Int>>()
+    private val images = LinkedHashMap<Pair<Int, Int>, Bitmap>(8, .75f, true)
+    private var imageBytes = 0L
+    private val texts = LinkedHashMap<Int, PageText>(8, .75f, true)
+    val pageCount: Int = pdf.numberOfPages
     init {
         try {
             require(!pdf.isEncrypted) { "Encrypted PDFs are not supported" }
@@ -64,13 +70,15 @@ class PdfEngine(file: File, cache: File) : Closeable {
             try { renderer = PdfRenderer(descriptor) } catch (e: Exception) { descriptor.close(); throw e }
         } catch (e: Exception) { pdf.close(); throw e }
     }
-    @Synchronized fun dimensions(page: Int): Pair<Int, Int> {
+    fun dimensions(page: Int): Pair<Int, Int> = synchronized(rendererLock) {
         check(!closed)
-        return renderer.openPage(page).use { it.width to it.height }
+        sizes.getOrPut(page) { renderer.openPage(page).use { it.width to it.height } }
     }
-    @Synchronized fun render(page: Int, width: Int): Bitmap {
+    fun render(page: Int, width: Int): Bitmap = synchronized(rendererLock) {
         check(!closed)
-        return renderer.openPage(page).use { p ->
+        val key = page to width.coerceIn(64, 2200)
+        images[key]?.let { return@synchronized it }
+        val rendered = renderer.openPage(page).use { p ->
             val w = width.coerceIn(64, 2200)
             val h = (w.toFloat() * p.height / p.width).roundToInt().coerceAtLeast(1)
             val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -78,9 +86,19 @@ class PdfEngine(file: File, cache: File) : Closeable {
             p.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
             bitmap
         }
+        images[key] = rendered
+        imageBytes += rendered.allocationByteCount
+        val iterator = images.entries.iterator()
+        while (imageBytes > 32L * 1024 * 1024 && iterator.hasNext()) {
+            imageBytes -= iterator.next().value.allocationByteCount
+            // Visible views can still hold this bitmap: let GC reclaim it, never recycle here.
+            iterator.remove()
+        }
+        rendered
     }
-    @Synchronized fun text(page: Int): PageText {
+    fun text(page: Int): PageText = synchronized(textLock) {
         check(!closed)
+        texts[page]?.let { return@synchronized it }
         val pdPage = pdf.getPage(page)
         val rotated = pdPage.rotation % 180 != 0
         val w = if (rotated) pdPage.cropBox.height else pdPage.cropBox.width
@@ -111,9 +129,17 @@ class PdfEngine(file: File, cache: File) : Closeable {
         stripper.startPage = page + 1
         stripper.endPage = page + 1
         stripper.getText(pdf)
-        return PageText(page, buffer.toString(), glyphs)
+        val result = PageText(page, buffer.toString(), glyphs)
+        texts[page] = result
+        if (texts.size > 6) texts.remove(texts.keys.first())
+        result
     }
-    @Synchronized override fun close() {
-        if (!closed) { closed = true; renderer.close(); descriptor.close(); pdf.close() }
+    override fun close() = synchronized(rendererLock) {
+        synchronized(textLock) {
+            if (!closed) {
+                closed = true; images.clear(); imageBytes = 0; texts.clear(); sizes.clear()
+                renderer.close(); descriptor.close(); pdf.close()
+            }
+        }
     }
 }

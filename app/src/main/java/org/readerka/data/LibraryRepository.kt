@@ -15,7 +15,7 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
     val dao = database.dao()
     val pdfDirectory = pdfRoot.apply { mkdirs() }
     val snapshots = database.invalidationTracker.createFlow(
-        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks"
+        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks", "reader_folders", "reader_memberships"
     ).map { dao.snapshot() }
     fun pdfFile(document: Document): File {
         require(document.storedName.matches(Regex("[A-Za-z0-9_-]+\\.pdf"))) { "Unsafe PDF name" }
@@ -40,12 +40,39 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
             dao.putDocument(document); document
         } catch (e: Exception) { pending.delete(); file.delete(); throw e }
     }
-    suspend fun saveEntry(entry: Entry, tagNames: String, collectionIds: Set<String>) = database.withTransaction {
+    suspend fun saveEntry(entry: Entry, tagNames: String, collectionIds: Set<String>, readerFolderIds: Set<String>? = null) = database.withTransaction {
+        if (readerFolderIds != null) {
+            val folders = dao.allReaderFolders().associateBy { it.id }
+            require(readerFolderIds.all { folders[it]?.let { f -> f.documentId == entry.documentId && f.kind == ReaderFolderKind.Quotes } == true })
+        }
         dao.putEntry(entry.copy(updatedAt = System.currentTimeMillis()))
         dao.clearEntryTags(entry.id)
         for (tag in resolveTags(tagNames)) dao.putEntryTag(EntryTag(entry.id, tag.id))
         dao.clearMemberships(entry.id)
         for (id in collectionIds) dao.putMembership(Membership(id, entry.id))
+        if (readerFolderIds != null) {
+            dao.clearReaderMemberships(entry.id)
+            for (id in readerFolderIds) dao.putReaderMembership(ReaderMembership(id, entry.id))
+        }
+    }
+    suspend fun saveReaderFolder(folder: ReaderFolder) = database.withTransaction {
+        require(folder.name.isNotBlank())
+        val all = dao.allReaderFolders()
+        val old = all.firstOrNull { it.id == folder.id }
+        require(old == null || old.documentId == folder.documentId && old.kind == folder.kind)
+        val scoped = all.filter { it.documentId == folder.documentId && it.kind == folder.kind && it.id != folder.id } + folder
+        FolderTree.validate(scoped.map { it.id to it.parentId })
+        dao.putReaderFolder(folder)
+    }
+    suspend fun saveBookmark(bookmark: Bookmark) = database.withTransaction {
+        require(bookmark.title.isNotBlank() && bookmark.offset in 0..10_000)
+        val document = dao.allDocuments().first { it.id == bookmark.documentId }
+        require(bookmark.page in 0 until document.pageCount)
+        bookmark.folderId?.let { id -> require(dao.allReaderFolders().any { it.id == id && it.documentId == bookmark.documentId && it.kind == ReaderFolderKind.Bookmarks }) }
+        val all = dao.allBookmarks()
+        require(all.none { it.id == bookmark.id && it.documentId != bookmark.documentId })
+        FolderTree.validate((all.filter { it.documentId == bookmark.documentId && it.id != bookmark.id } + bookmark).map { it.id to it.parentId })
+        dao.putBookmark(bookmark)
     }
     suspend fun saveDocument(document: Document, tagNames: String) = database.withTransaction {
         dao.putDocument(document); dao.clearDocumentTags(document.id)

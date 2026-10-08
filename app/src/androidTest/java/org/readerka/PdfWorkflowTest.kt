@@ -23,6 +23,21 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class PdfWorkflowTest {
     private val context = ApplicationProvider.getApplicationContext<ReaderkaApp>()
+    @Test fun pannedPageRemainsVisibleAfterViewportShrinks() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val image = android.graphics.Bitmap.createBitmap(32, 32, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(Color.CYAN) }
+            val view = PdfPageView(context).apply { bitmap = image; layout(0, 0, 800, 1000); setZoom(5f) }
+            val now = SystemClock.uptimeMillis()
+            for ((action, x) in listOf(MotionEvent.ACTION_DOWN to 400f, MotionEvent.ACTION_MOVE to -4000f, MotionEvent.ACTION_UP to -4000f)) {
+                MotionEvent.obtain(now, now, action, x, 500f, 0).let { view.onTouchEvent(it); it.recycle() }
+            }
+            view.layout(0, 0, 200, 300)
+            val output = android.graphics.Bitmap.createBitmap(200, 300, android.graphics.Bitmap.Config.ARGB_8888)
+            view.draw(android.graphics.Canvas(output))
+            assertEquals("The panned bitmap must still cover the narrower viewport", Color.CYAN, output.getPixel(100, 150))
+            view.reset(); image.recycle(); output.recycle()
+        }
+    }
     private fun fixture(): File {
         val file = File(context.cacheDir, "selection-fixture.pdf")
         PDDocument().use { pdf ->

@@ -99,7 +99,15 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
         repository.dao.putEntry(Entry(UUID.randomUUID().toString(), text.lineSequence().first().take(80), text,
             documentId = doc.id, anchor = anchor, type = NoteType.Quote, color = color))
     } }
-    fun saveEntry(entry: Entry, tags: String, collections: Set<String>) = perform { repository.saveEntry(entry, tags, collections) }
+    fun saveEntry(entry: Entry, tags: String, collections: Set<String>, readerFolders: Set<String>? = null) = perform { repository.saveEntry(entry, tags, collections, readerFolders) }
+    fun readerFolder(value: ReaderFolder) = perform { repository.saveReaderFolder(value) }
+    fun deleteReaderFolder(id: String) = perform { repository.dao.deleteReaderFolder(id) }
+    fun saveBookmark(value: Bookmark) = perform { repository.saveBookmark(value) }
+    fun openBookmark(value: Bookmark) {
+        library.value.documents.firstOrNull { it.id == value.documentId }?.let { document ->
+            open(document.copy(lastPage = value.page, lastOffset = value.offset))
+        }
+    }
     fun saveDocument(document: Document, tags: String) = perform { repository.saveDocument(document, tags) }
     fun folder(value: DocumentFolder) = perform { repository.saveFolder(value) }
     fun collection(value: Collection) = perform { repository.saveCollection(value) }
@@ -109,7 +117,7 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     fun batch(ids: Set<String>, color: Marker? = null, type: NoteType? = null, tags: String? = null, collection: String? = null) = perform { repository.batch(ids, color, type, tags, collection) }
     fun bookmark(page: Int, title: String, comment: String) = perform {
         val doc = _reader.value?.document ?: return@perform
-        repository.dao.putBookmark(Bookmark(UUID.randomUUID().toString(), doc.id, page, title, comment))
+        repository.saveBookmark(Bookmark(UUID.randomUUID().toString(), doc.id, page, title, comment))
     }
     fun deleteBookmark(id: String) = perform { repository.dao.deleteBookmark(id) }
     fun renameTag(id: String, name: String) = perform { repository.renameTag(id, name) }
