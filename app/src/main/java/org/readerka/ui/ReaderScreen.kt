@@ -5,8 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.Intent
-import android.net.Uri
 import android.view.KeyEvent
 import android.view.Window
 import androidx.compose.foundation.horizontalScroll
@@ -24,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -42,14 +41,8 @@ import kotlin.math.roundToInt
 private data class Selection(val text: String, val anchor: Anchor, val view: PdfPageView)
 private data class PdfMatch(val text: String, val anchor: Anchor)
 
-/** The translator is external; Readerka itself remains offline and needs no network permission. */
-fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
-    Uri.Builder().scheme("https").authority("translate.google.com").appendPath("")
-        .appendQueryParameter("sl", "auto").appendQueryParameter("tl", "ru")
-        .appendQueryParameter("text", text).appendQueryParameter("op", "translate").build())
-
 @OptIn(FlowPreview::class)
-@Composable fun ReaderScreen(session: ReaderSession?, data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit) {
+@Composable fun ReaderScreen(session: ReaderSession?, data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit, onWorkspaceShortcut: (KeyEvent) -> Boolean = { false }) {
     if (session == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.no_document_open)) }; return }
     key(session.engine) {
         val list = rememberLazyListState(session.page)
@@ -70,6 +63,7 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
         var bookmark by remember { mutableStateOf<Bookmark?>(null) }
         var pageInput by remember { mutableStateOf("") }
         var search by remember { mutableStateOf(false) }
+        var translation by rememberSaveable { mutableStateOf<String?>(null) }
         val currentPage by remember { derivedStateOf { list.firstVisibleItemIndex.coerceIn(0, session.engine.pageCount - 1) } }
         val docEntries = data.entries.filter { it.documentId == session.document.id }
         val docBookmarks = data.bookmarks.filter { it.documentId == session.document.id }
@@ -86,7 +80,9 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
             val offset = session.anchor?.rects?.firstOrNull()?.top?.let { (it * (height - with(density) { 24.dp.toPx() }) - with(density) { 64.dp.toPx() }).toInt().coerceAtLeast(0) }
                 ?: (session.offset * height / 10_000).toInt()
             withFrameNanos { }
-            list.scrollToItem(session.page, offset)
+            // Remeasurement touches AndroidViews: always return to the Android UI dispatcher
+            // after asynchronous PDF dimensions and a frame-clock suspension.
+            withContext(Dispatchers.Main) { list.scrollToItem(session.page, offset) }
         }
         LaunchedEffect(list, session.engine, fitPage, viewport) {
             if (viewport.width <= 0 || viewport.height <= 0) return@LaunchedEffect
@@ -102,7 +98,8 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
             vm.open(session.document, page = page.coerceIn(0, session.engine.pageCount - 1))
         }
         val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
-            if (edited != null || bookmark != null || jump || search) false
+            if (edited != null || bookmark != null || jump || search || translation != null) false
+            else if (onWorkspaceShortcut(event)) true
             else {
                 val target = when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> currentPage + 1
@@ -147,8 +144,8 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
                     Text(s.text, maxLines = 2, style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
-                            runCatching { context.startActivity(translationIntent(s.text)) }
-                                .onFailure { scope.launch { vm.messages.emit(context.getString(R.string.translation_unavailable)) } }
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text))
+                            translation = s.text
                         }) { Text(stringResource(R.string.translate)) }
                         TextButton(onClick = {
                             edited = Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
@@ -177,7 +174,7 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
                     if (wide && showPanel) {
                         VerticalDivider()
                         ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                            { edited = it }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(350.dp).fillMaxHeight())
+                            { edited = it }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(300.dp).fillMaxHeight())
                     }
                 }
             }
@@ -187,6 +184,7 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
                 }, { quickPages = false })
             }
         }
+        translation?.let { TranslationOverlay(it) { translation = null } }
         if (jump) AlertDialog(onDismissRequest = { jump = false }, title = { Text(stringResource(R.string.jump_to_page)) }, text = { OutlinedTextField(pageInput, { pageInput = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.page_number)) }) },
             confirmButton = { TextButton(enabled = (pageInput.toIntOrNull() ?: 0) in 1..session.engine.pageCount, onClick = { go(pageInput.toInt() - 1); jump = false }) { Text(stringResource(R.string.go)) } }, dismissButton = { TextButton(onClick = { jump = false }) { Text(stringResource(R.string.cancel)) } })
         bookmark?.let { b -> BookmarkEditor(b, data, { bookmark = null }, { vm.saveBookmark(it) }) }
@@ -253,14 +251,17 @@ fun translationIntent(text: String): Intent = Intent(Intent.ACTION_VIEW,
                         TextButton(onClick = { retry++ }) { Text(stringResource(R.string.retry_page)) }
                     } else { CircularProgressIndicator(); Text(stringResource(R.string.loading_page)) }
                 }
-            } else AndroidView(factory = { context -> PdfPageView(context) },
+            } else key(MaterialTheme.colorScheme.surface) {
+                // Recreate the native canvas when the window theme changes; keep cached PDF data.
+                AndroidView(factory = { context -> PdfPageView(context) },
                 onReset = { it.reset() }, onRelease = { it.reset() },
                 update = { view ->
                     view.bitmap = bitmap; view.pageText = text; view.highlights = highlights
                     view.onSelection = { quote, anchor -> onSelection(quote, anchor, view) }
                     view.onHighlight = onHighlight; view.onCenterTap = onCenterTap
                     view.onNavigationKey = onKey
-                }, modifier = Modifier.fillMaxSize())
+                }, modifier = Modifier.fillMaxSize().clipToBounds())
+            }
             if (bitmap != null && text?.glyphs?.isEmpty() == true) Text(stringResource(R.string.no_text_layer),
                 style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
         }

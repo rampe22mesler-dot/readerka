@@ -33,7 +33,7 @@ class LibraryUiTest {
         val names = listOf("Первая тестовая папка $suffix", "Вторая тестовая папка $suffix")
         val tagNames = listOf("ТестКант_$suffix", "ТестОнтология_$suffix")
         try {
-            compose.onNodeWithText("Заметки и цитаты").performClick()
+            compose.onNodeWithContentDescription("Заметки и цитаты").performClick()
             for (name in names) {
                 compose.onNodeWithText("Создать папку").performClick()
                 compose.onNodeWithText("Название").performTextInput(name)
@@ -86,7 +86,7 @@ class LibraryUiTest {
             val d = Document(id, title, "source.pdf", file.name, pageCount = 3)
             entry = Entry(id, "Цитата $id", "Existence", documentId = id, anchor = anchor, type = NoteType.Quote)
             runBlocking { dao.putDocument(d); dao.putEntry(entry!!) }
-            compose.onNodeWithText("Заметки и цитаты").performClick()
+            compose.onNodeWithContentDescription("Заметки и цитаты").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithText("Цитата $id").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Открыть в PDF").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithText("Страница 3 из 3").fetchSemanticsNodes().isNotEmpty() }

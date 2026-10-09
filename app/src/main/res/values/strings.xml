@@ -83,7 +83,7 @@
     <string name="backup">Создать резервную копию</string>
     <string name="restore">Восстановить резервную копию</string>
     <string name="restore_explanation">Проверенный архив добавляется к библиотеке. Конфликтующие записи не перезаписываются.</string>
-    <string name="offline_notice">Все данные хранятся на устройстве. Для чтения интернет не нужен. Перевод открывается в браузере и требует интернет.</string>
+    <string name="offline_notice">Все данные хранятся на устройстве. Для чтения интернет не нужен. Только окно Google Переводчика использует интернет и получает выбранный вами текст.</string>
     <string name="importing">Импорт PDF…</string>
     <string name="opening">Открытие PDF…</string>
     <string name="exporting">Экспорт…</string>
@@ -153,6 +153,14 @@
     <string name="next_page">Следующая страница</string>
     <string name="retry_page">Повторить загрузку страницы</string>
     <string name="translate">Перевести</string>
-    <string name="translation_unavailable">Не удалось открыть переводчик. Установите браузер.</string>
-    <string name="reader_hint">Удержание — выделить текст; касание середины — полоса страниц. Стрелки клавиатуры — листать.</string>
+    <string name="translation_title">Google Переводчик</string>
+    <string name="retry_translation">Обновить перевод</string>
+    <string name="translation_connection_failed">Не удалось загрузить Google Переводчик. Проверьте интернет и нажмите обновление. Выделенный текст уже в буфере обмена.</string>
+    <string name="workspace_files">Библиотека</string>
+    <string name="empty_workspace">Добавьте PDF или создайте папку для своей библиотеки.</string>
+    <string name="workspace_counts">%1$d документов · %2$d записей</string>
+    <string name="toggle_sidebar">Показать или скрыть библиотеку</string>
+    <string name="close_document">Закрыть вкладку документа</string>
+    <string name="keyboard_shortcuts">Клавиатура при чтении: стрелки и Page Up / Down — страницы; Home / End — начало и конец; Ctrl+B — библиотека; Ctrl+Tab — следующая вкладка; Ctrl+Shift+Tab — предыдущая; Ctrl+W — закрыть вкладку.</string>
+    <string name="reader_hint">Удержание — выделить слово; касание середины — полоса страниц. Стрелки клавиатуры — листать.</string>
 </resources>

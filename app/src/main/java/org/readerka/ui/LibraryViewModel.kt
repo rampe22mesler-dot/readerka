@@ -31,6 +31,7 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     val busy = _busy.asStateFlow()
     val messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val screen = savedState.getStateFlow("screen", "library")
+    val openDocumentIds = savedState.getStateFlow<ArrayList<String>>("open-documents", arrayListOf())
     var pendingExport: ExportKind
         get() = savedState.get<String>("export-kind")?.let(ExportKind::valueOf) ?: ExportKind.Obsidian
         set(value) { savedState["export-kind"] = value.name }
@@ -71,6 +72,7 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
             _reader.value = existing.copy(document = document, page = (page ?: anchor?.page ?: document.lastPage).coerceIn(0, existing.engine.pageCount - 1),
                 offset = if (page == null && anchor == null) document.lastOffset else 0, anchor = anchor, token = UUID.randomUUID().toString())
             if (navigate) this.navigate("reader")
+            rememberOpenDocument(document.id)
             return
         }
         opening?.cancel()
@@ -84,9 +86,27 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
                 newEngine = null
                 old?.engine?.let { withContext(Dispatchers.IO) { it.close() } }
                 savedState["document"] = document.id
+                rememberOpenDocument(document.id)
                 if (navigate) this@LibraryViewModel.navigate("reader")
             } finally { newEngine?.let { withContext(NonCancellable + Dispatchers.IO) { it.close() } } }
         }
+    }
+    private fun rememberOpenDocument(id: String) {
+        if (id !in openDocumentIds.value) savedState["open-documents"] = ArrayList(openDocumentIds.value + id)
+    }
+    fun closeDocument(id: String) {
+        val ids = openDocumentIds.value
+        val index = ids.indexOf(id)
+        val remaining = ids.filterNot { it == id }
+        savedState["open-documents"] = ArrayList(remaining)
+        if (_reader.value?.document?.id != id) return
+        val engine = _reader.value?.engine
+        _reader.value = null
+        savedState["document"] = null
+        engine?.let { viewModelScope.launch(Dispatchers.IO) { it.close() } }
+        val next = remaining.getOrNull(index.coerceAtLeast(0).coerceAtMost((remaining.size - 1).coerceAtLeast(0)))
+        val document = library.value.documents.firstOrNull { it.id == next }
+        if (document != null) open(document) else navigate("library")
     }
     fun source(entry: Entry) { library.value.documents.firstOrNull { it.id == entry.documentId }?.let { open(it, entry.anchor) } }
     fun position(document: Document, page: Int, offset: Int) = perform {

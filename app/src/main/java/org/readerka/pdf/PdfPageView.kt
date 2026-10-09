@@ -31,6 +31,7 @@ class PdfPageView(context: Context) : View(context) {
     private var endGlyph: Int? = null
     private var selecting = false
     private var movingStart = false
+    private var initialWord: IntRange? = null
     private var downX = 0f
     private var downY = 0f
     private var lastX = 0f
@@ -42,7 +43,8 @@ class PdfPageView(context: Context) : View(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val longPress = Runnable {
         val hit = hit(downX, downY) ?: return@Runnable
-        startGlyph = hit; endGlyph = hit; selecting = true; movingStart = false
+        val word = pageText?.wordAt(hit) ?: return@Runnable
+        initialWord = word; startGlyph = word.first; endGlyph = word.last; selecting = true; movingStart = false
         parent?.requestDisallowInterceptTouchEvent(true)
         notifySelection()
     }
@@ -64,7 +66,7 @@ class PdfPageView(context: Context) : View(context) {
         }
     })
     init { isClickable = true; isFocusable = true; isFocusableInTouchMode = true; setOnKeyListener { _, _, event -> onNavigationKey(event) } }
-    fun clearSelection() { startGlyph = null; endGlyph = null; cachedSelection = null; selecting = false; invalidate() }
+    fun clearSelection() { startGlyph = null; endGlyph = null; initialWord = null; cachedSelection = null; selecting = false; invalidate() }
     fun reset() { handler.removeCallbacksAndMessages(null); parent?.requestDisallowInterceptTouchEvent(false); clearSelection(); fitWidth(); bitmap = null; pageText = null; highlights = emptyList() }
     fun fitWidth() { zoom = 1f; panX = 0f; panY = 0f; invalidate() }
     fun setZoom(value: Float) { zoom = value.coerceIn(1f, 5f); clampPan(); invalidate() }
@@ -123,14 +125,18 @@ class PdfPageView(context: Context) : View(context) {
                     val sr = screenRect(r)
                     kotlin.math.hypot(event.x - sr.centerX(), event.y - (sr.bottom + 10 * resources.displayMetrics.density)) < 28 * resources.displayMetrics.density
                 }
-                if (at >= 0) { selecting = true; movingStart = at == 0; parent?.requestDisallowInterceptTouchEvent(true) }
+                if (at >= 0) { initialWord = null; selecting = true; movingStart = at == 0; parent?.requestDisallowInterceptTouchEvent(true) }
                 else { selecting = false; handler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong()) }
                 if (zoom > 1f) parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (event.pointerCount > 1 || scaleDetector.isInProgress) return true
                 if (selecting) {
-                    hit(event.x, event.y)?.let { if (movingStart) startGlyph = it else endGlyph = it }
+                    hit(event.x, event.y)?.let { at ->
+                        val word = initialWord
+                        if (word != null) { startGlyph = minOf(at, word.first); endGlyph = maxOf(at, word.last) }
+                        else if (movingStart) startGlyph = at else endGlyph = at
+                    }
                     notifySelection()
                 } else {
                     if (kotlin.math.hypot(event.x - downX, event.y - downY) > slop) handler.removeCallbacks(longPress)

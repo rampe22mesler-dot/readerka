@@ -1,0 +1,6 @@
+org.readerka.ReaderControlsTest:...
+org.readerka.PdfWorkflowTest:...
+
+Time: 218.108
+
+OK (6 tests)

@@ -42,6 +42,7 @@ import org.readerka.export.*
         Text(stringResource(R.string.restore_explanation), modifier = Modifier.widthIn(max = 650.dp))
         OutlinedButton(onClick = onRestore) { Text(stringResource(R.string.restore)) }
         HorizontalDivider()
+        Text(stringResource(R.string.keyboard_shortcuts), style = MaterialTheme.typography.bodySmall)
         Text(stringResource(R.string.offline_notice), style = MaterialTheme.typography.bodySmall)
     }
     if (manageTags) AlertDialog(onDismissRequest = { manageTags = false }, title = { Text(stringResource(R.string.manage_tags)) }, text = {

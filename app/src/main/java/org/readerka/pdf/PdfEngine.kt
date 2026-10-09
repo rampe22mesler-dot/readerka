@@ -12,10 +12,22 @@ import org.readerka.data.Anchor
 import org.readerka.data.PageRect
 import java.io.Closeable
 import java.io.File
+import java.text.BreakIterator
+import java.util.Locale
 import kotlin.math.*
 
 data class Glyph(val start: Int, val end: Int, val rect: PageRect)
 data class PageText(val page: Int, val text: String, val glyphs: List<Glyph>) {
+    fun wordAt(glyph: Int): IntRange {
+        require(glyph in glyphs.indices)
+        val offset = glyphs[glyph].start
+        val words = BreakIterator.getWordInstance(Locale.ROOT).apply { setText(this@PageText.text) }
+        val start = if (words.isBoundary(offset)) offset else words.preceding(offset)
+        val end = words.following(offset).takeIf { it != BreakIterator.DONE } ?: text.length
+        val first = glyphs.indexOfFirst { it.end > start }.coerceAtLeast(0)
+        val last = glyphs.indexOfLast { it.start < end }.coerceAtLeast(first)
+        return first..last
+    }
     fun selection(first: Int, last: Int): Pair<String, Anchor>? {
         if (glyphs.isEmpty()) return null
         val a = min(first, last).coerceIn(glyphs.indices)

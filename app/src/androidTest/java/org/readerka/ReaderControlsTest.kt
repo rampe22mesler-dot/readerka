@@ -140,19 +140,22 @@ class ReaderControlsTest {
         compose.waitUntil(30_000) { runBlocking { dao.allEntries().none { it.id == entry.id } } }
         assertTrue(runBlocking { dao.allDocuments().any { it.id == document.id } })
         view = pageView(0)
-        fun touch(action: Int, last: Boolean) = compose.runOnUiThread {
-            val glyph = if (last) view.pageText!!.glyphs.last() else view.pageText!!.glyphs.first()
-            val rect = view.screenRect(glyph.rect); val now = SystemClock.uptimeMillis()
+        val text = compose.runOnUiThread { view.pageText!! }
+        val start = text.text.indexOf("quotation")
+        val glyph = text.glyphs.first { it.start == start + 4 }
+        val rect = compose.runOnUiThread { view.screenRect(glyph.rect) }
+        fun touch(action: Int) = compose.runOnUiThread {
+            val now = SystemClock.uptimeMillis()
             MotionEvent.obtain(now, now, action, rect.centerX(), rect.centerY(), 0).let { view.onTouchEvent(it); it.recycle() }
         }
-        touch(MotionEvent.ACTION_DOWN, false); SystemClock.sleep(650)
-        touch(MotionEvent.ACTION_MOVE, true); touch(MotionEvent.ACTION_UP, true)
+        touch(MotionEvent.ACTION_DOWN); SystemClock.sleep(650); touch(MotionEvent.ACTION_UP)
+        compose.onNodeWithText("quotation", substring = false).assertExists()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        var translated: Intent? = null
+        var externalLaunch = false
         val monitor = object : Instrumentation.ActivityMonitor() {
             override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
-                if (intent.data?.host == "translate.google.com") {
-                    translated = Intent(intent)
+                if (intent.action == Intent.ACTION_VIEW) {
+                    externalLaunch = true
                     return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
                 }
                 return null
@@ -161,10 +164,20 @@ class ReaderControlsTest {
         instrumentation.addMonitor(monitor)
         try {
             compose.onNodeWithText("Перевести").performClick()
-            compose.waitUntil(10_000) { translated != null }
-            val uri = translated!!.data!!
-            assertEquals("https", uri.scheme); assertEquals("auto", uri.getQueryParameter("sl")); assertEquals("ru", uri.getQueryParameter("tl"))
-            assertTrue(uri.getQueryParameter("text")!!.contains("quotation & a question?"))
+            compose.onNodeWithTag("translation-overlay").assertIsDisplayed()
+            compose.onNodeWithTag("translation-source").assertTextEquals("quotation")
+            val uri = android.net.Uri.parse(org.readerka.ui.translationUrl("quotation & вопрос?\nслово"))
+            assertEquals("https", uri.scheme); assertEquals("translate.google.com", uri.host)
+            assertEquals("auto", uri.getQueryParameter("sl")); assertEquals("ru", uri.getQueryParameter("tl"))
+            assertEquals("quotation & вопрос?\nслово", uri.getQueryParameter("text"))
+            compose.runOnUiThread {
+                val clipboard = app.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                assertEquals("quotation", clipboard.primaryClip!!.getItemAt(0).text.toString())
+            }
+            assertFalse("Translation must stay in Readerka", externalLaunch)
+            compose.onNodeWithTag("close-translation").performClick()
+            waitPage(0)
+            compose.onNodeWithTag("translation-overlay").assertDoesNotExist()
         } finally { instrumentation.removeMonitor(monitor) }
     }
 

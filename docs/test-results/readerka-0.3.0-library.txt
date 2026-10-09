@@ -1,0 +1,5 @@
+org.readerka.LibraryUiTest:..
+
+Time: 118.036
+
+OK (2 tests)
