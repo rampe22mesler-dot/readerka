@@ -1,0 +1,567 @@
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+org.readerka.WorkspaceRecoveryTest:
+INSTRUMENTATION_STATUS: test=durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReadingWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ReadingWorkspaceUiTest:
+INSTRUMENTATION_STATUS: test=commandSearchOpensSourceAndAltHistoryReturnsToPageAndOffset
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReadingWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=commandSearchOpensSourceAndAltHistoryReturnsToPageAndOffset
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReadingWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=closedStandaloneDraftResumesFromToolbarAndCtrlEnterSavesInsideDialog
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReadingWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=closedStandaloneDraftResumesFromToolbarAndCtrlEnterSavesInsideDialog
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReadingWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=inlineDraftSurvivesRecreationAndKeyboardSaveDoesNotDuplicateNote
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReadingWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=inlineDraftSurvivesRecreationAndKeyboardSaveDoesNotDuplicateNote
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ReaderControlsTest:
+INSTRUMENTATION_STATUS: test=keyboardAndCenterTapSliderNavigateAndScrolledPagesKeepTheirImages
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=keyboardAndCenterTapSliderNavigateAndScrolledPagesKeepTheirImages
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=documentFoldersAndNestedBookmarksAreAvailableDuringReading
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=documentFoldersAndNestedBookmarksAreAvailableDuringReading
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=tapSavedHighlightDeleteItAndTranslateRealSelection
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'delete-quote')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.ReaderControlsTest.tapSavedHighlightDeleteItAndTranslateRealSelection$lambda$34(ReaderControlsTest.kt:144)
+	at org.readerka.ReaderControlsTest.$r8$lambda$GSxkgWB84l_y5iZC88e8mjwnFf0(Unknown Source:0)
+	at org.readerka.ReaderControlsTest$$ExternalSyntheticLambda15.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ReaderControlsTest.withDocument(ReaderControlsTest.kt:82)
+	at org.readerka.ReaderControlsTest.tapSavedHighlightDeleteItAndTranslateRealSelection(ReaderControlsTest.kt:139)
+
+INSTRUMENTATION_STATUS: stream=
+Error in tapSavedHighlightDeleteItAndTranslateRealSelection(org.readerka.ReaderControlsTest):
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'delete-quote')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.ReaderControlsTest.tapSavedHighlightDeleteItAndTranslateRealSelection$lambda$34(ReaderControlsTest.kt:144)
+	at org.readerka.ReaderControlsTest.$r8$lambda$GSxkgWB84l_y5iZC88e8mjwnFf0(Unknown Source:0)
+	at org.readerka.ReaderControlsTest$$ExternalSyntheticLambda15.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ReaderControlsTest.withDocument(ReaderControlsTest.kt:82)
+	at org.readerka.ReaderControlsTest.tapSavedHighlightDeleteItAndTranslateRealSelection(ReaderControlsTest.kt:139)
+
+INSTRUMENTATION_STATUS: test=tapSavedHighlightDeleteItAndTranslateRealSelection
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.LibraryUiTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+org.readerka.LibraryUiTest:
+INSTRUMENTATION_STATUS: test=openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.LibraryUiTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (ContentDescription = 'Жёлтый' (ignoreCase: false))
+Nodes found:
+1) Node #3309 at (l=712.0, t=211.0, r=752.0, b=251.0)px
+Role = 'Button'
+Focused = 'false'
+ContentDescription = '[Жёлтый]'
+Actions = [OnClick, RequestFocus]
+MergeDescendants = 'true'
+Has 9 siblings
+2) Node #3238 at (l=936.0, t=695.0, r=976.0, b=735.0)px
+Role = 'Button'
+Focused = 'false'
+ContentDescription = '[Жёлтый]'
+Actions = [OnClick, RequestFocus]
+MergeDescendants = 'true'
+Has 15 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.LibraryUiTest.openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation(LibraryUiTest.kt:112)
+
+INSTRUMENTATION_STATUS: stream=
+Error in openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation(org.readerka.LibraryUiTest):
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (ContentDescription = 'Жёлтый' (ignoreCase: false))
+Nodes found:
+1) Node #3309 at (l=712.0, t=211.0, r=752.0, b=251.0)px
+Role = 'Button'
+Focused = 'false'
+ContentDescription = '[Жёлтый]'
+Actions = [OnClick, RequestFocus]
+MergeDescendants = 'true'
+Has 9 siblings
+2) Node #3238 at (l=936.0, t=695.0, r=976.0, b=735.0)px
+Role = 'Button'
+Focused = 'false'
+ContentDescription = '[Жёлтый]'
+Actions = [OnClick, RequestFocus]
+MergeDescendants = 'true'
+Has 15 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.LibraryUiTest.openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation(LibraryUiTest.kt:112)
+
+INSTRUMENTATION_STATUS: test=openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.LibraryUiTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=createEditAndOrganizeNoteThroughRealUi
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.LibraryUiTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed to perform text input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Название' (ignoreCase: false))
+Nodes found:
+1) Node #3482 at (l=12.0, t=84.0, r=552.0, b=148.0)px, Tag: 'entry-title'
+EditableText = 'Saved quotation'
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 15 siblings
+2) Node #3560 at (l=24.0, t=72.0, r=304.0, b=136.0)px
+EditableText = ''
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 4 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus(TextActions.kt:114)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus$default(TextActions.kt:108)
+	at androidx.compose.ui.test.TextActionsKt.performTextInput(TextActions.kt:44)
+	at org.readerka.LibraryUiTest.createEditAndOrganizeNoteThroughRealUi(LibraryUiTest.kt:39)
+
+INSTRUMENTATION_STATUS: stream=
+Error in createEditAndOrganizeNoteThroughRealUi(org.readerka.LibraryUiTest):
+java.lang.AssertionError: Failed to perform text input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Название' (ignoreCase: false))
+Nodes found:
+1) Node #3482 at (l=12.0, t=84.0, r=552.0, b=148.0)px, Tag: 'entry-title'
+EditableText = 'Saved quotation'
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 15 siblings
+2) Node #3560 at (l=24.0, t=72.0, r=304.0, b=136.0)px
+EditableText = ''
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 4 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus(TextActions.kt:114)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus$default(TextActions.kt:108)
+	at androidx.compose.ui.test.TextActionsKt.performTextInput(TextActions.kt:44)
+	at org.readerka.LibraryUiTest.createEditAndOrganizeNoteThroughRealUi(LibraryUiTest.kt:39)
+
+INSTRUMENTATION_STATUS: test=createEditAndOrganizeNoteThroughRealUi
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.FolderWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+org.readerka.FolderWorkspaceUiTest:
+INSTRUMENTATION_STATUS: test=foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.FolderWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed to perform text input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Название' (ignoreCase: false))
+Nodes found:
+1) Node #3742 at (l=12.0, t=84.0, r=552.0, b=148.0)px, Tag: 'entry-title'
+EditableText = 'Saved quotation'
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 15 siblings
+2) Node #3820 at (l=24.0, t=72.0, r=304.0, b=136.0)px
+EditableText = ''
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 4 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus(TextActions.kt:114)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus$default(TextActions.kt:108)
+	at androidx.compose.ui.test.TextActionsKt.performTextInput(TextActions.kt:44)
+	at org.readerka.FolderWorkspaceUiTest.foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation(FolderWorkspaceUiTest.kt:54)
+
+INSTRUMENTATION_STATUS: stream=
+Error in foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation(org.readerka.FolderWorkspaceUiTest):
+java.lang.AssertionError: Failed to perform text input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Название' (ignoreCase: false))
+Nodes found:
+1) Node #3742 at (l=12.0, t=84.0, r=552.0, b=148.0)px, Tag: 'entry-title'
+EditableText = 'Saved quotation'
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 15 siblings
+2) Node #3820 at (l=24.0, t=72.0, r=304.0, b=136.0)px
+EditableText = ''
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 4 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus(TextActions.kt:114)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus$default(TextActions.kt:108)
+	at androidx.compose.ui.test.TextActionsKt.performTextInput(TextActions.kt:44)
+	at org.readerka.FolderWorkspaceUiTest.foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation(FolderWorkspaceUiTest.kt:54)
+
+INSTRUMENTATION_STATUS: test=foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.FolderWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.FolderWorkspaceUiTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=11
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Закрыть' (ignoreCase: false))
+Nodes found:
+1) Node #4175 at (l=349.0, t=599.0, r=432.0, b=639.0)px
+Focused = 'false'
+Role = 'Button'
+Text = '[Закрыть]'
+Actions = [OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution, GetTextLayoutResult]
+MergeDescendants = 'true'
+Has 5 siblings
+2) Node #4223 at (l=453.0, t=516.0, r=536.0, b=556.0)px
+Focused = 'false'
+Role = 'Button'
+Text = '[Закрыть]'
+Actions = [OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution, GetTextLayoutResult]
+MergeDescendants = 'true'
+Has 2 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.FolderWorkspaceUiTest.largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors(FolderWorkspaceUiTest.kt:135)
+
+INSTRUMENTATION_STATUS: stream=
+Error in largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors(org.readerka.FolderWorkspaceUiTest):
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Закрыть' (ignoreCase: false))
+Nodes found:
+1) Node #4175 at (l=349.0, t=599.0, r=432.0, b=639.0)px
+Focused = 'false'
+Role = 'Button'
+Text = '[Закрыть]'
+Actions = [OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution, GetTextLayoutResult]
+MergeDescendants = 'true'
+Has 5 siblings
+2) Node #4223 at (l=453.0, t=516.0, r=536.0, b=556.0)px
+Focused = 'false'
+Role = 'Button'
+Text = '[Закрыть]'
+Actions = [OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution, GetTextLayoutResult]
+MergeDescendants = 'true'
+Has 2 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.FolderWorkspaceUiTest.largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors(FolderWorkspaceUiTest.kt:135)
+
+INSTRUMENTATION_STATUS: test=largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 416.598
+There were 5 failures:
+1) tapSavedHighlightDeleteItAndTranslateRealSelection(org.readerka.ReaderControlsTest)
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'delete-quote')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.ReaderControlsTest.tapSavedHighlightDeleteItAndTranslateRealSelection$lambda$34(ReaderControlsTest.kt:144)
+	at org.readerka.ReaderControlsTest.$r8$lambda$GSxkgWB84l_y5iZC88e8mjwnFf0(Unknown Source:0)
+	at org.readerka.ReaderControlsTest$$ExternalSyntheticLambda15.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ReaderControlsTest.withDocument(ReaderControlsTest.kt:82)
+	at org.readerka.ReaderControlsTest.tapSavedHighlightDeleteItAndTranslateRealSelection(ReaderControlsTest.kt:139)
+2) openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation(org.readerka.LibraryUiTest)
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (ContentDescription = 'Жёлтый' (ignoreCase: false))
+Nodes found:
+1) Node #3309 at (l=712.0, t=211.0, r=752.0, b=251.0)px
+Role = 'Button'
+Focused = 'false'
+ContentDescription = '[Жёлтый]'
+Actions = [OnClick, RequestFocus]
+MergeDescendants = 'true'
+Has 9 siblings
+2) Node #3238 at (l=936.0, t=695.0, r=976.0, b=735.0)px
+Role = 'Button'
+Focused = 'false'
+ContentDescription = '[Жёлтый]'
+Actions = [OnClick, RequestFocus]
+MergeDescendants = 'true'
+Has 15 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.LibraryUiTest.openQuotationFromCatalogAtActualPageAndKeepItAfterRecreation(LibraryUiTest.kt:112)
+3) createEditAndOrganizeNoteThroughRealUi(org.readerka.LibraryUiTest)
+java.lang.AssertionError: Failed to perform text input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Название' (ignoreCase: false))
+Nodes found:
+1) Node #3482 at (l=12.0, t=84.0, r=552.0, b=148.0)px, Tag: 'entry-title'
+EditableText = 'Saved quotation'
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 15 siblings
+2) Node #3560 at (l=24.0, t=72.0, r=304.0, b=136.0)px
+EditableText = ''
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 4 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus(TextActions.kt:114)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus$default(TextActions.kt:108)
+	at androidx.compose.ui.test.TextActionsKt.performTextInput(TextActions.kt:44)
+	at org.readerka.LibraryUiTest.createEditAndOrganizeNoteThroughRealUi(LibraryUiTest.kt:39)
+4) foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation(org.readerka.FolderWorkspaceUiTest)
+java.lang.AssertionError: Failed to perform text input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Название' (ignoreCase: false))
+Nodes found:
+1) Node #3742 at (l=12.0, t=84.0, r=552.0, b=148.0)px, Tag: 'entry-title'
+EditableText = 'Saved quotation'
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 15 siblings
+2) Node #3820 at (l=24.0, t=72.0, r=304.0, b=136.0)px
+EditableText = ''
+TextSelectionRange = 'TextRange(0, 0)'
+IsEditable = 'true'
+ImeAction = 'Default'
+Focused = 'false'
+Text = '[Название]'
+Actions = [GetTextLayoutResult, SetText, InsertTextAtCursor, SetSelection, PerformImeAction, OnClick, OnLongClick, PasteText, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution]
+MergeDescendants = 'true'
+Has 4 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus(TextActions.kt:114)
+	at androidx.compose.ui.test.TextActionsKt.getNodeAndFocus$default(TextActions.kt:108)
+	at androidx.compose.ui.test.TextActionsKt.performTextInput(TextActions.kt:44)
+	at org.readerka.FolderWorkspaceUiTest.foldersCanBeCreatedWithoutQuoteAndMultiMembershipSurvivesRecreation(FolderWorkspaceUiTest.kt:54)
+5) largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors(org.readerka.FolderWorkspaceUiTest)
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but found '2' nodes that satisfy: (Text + EditableText contains 'Закрыть' (ignoreCase: false))
+Nodes found:
+1) Node #4175 at (l=349.0, t=599.0, r=432.0, b=639.0)px
+Focused = 'false'
+Role = 'Button'
+Text = '[Закрыть]'
+Actions = [OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution, GetTextLayoutResult]
+MergeDescendants = 'true'
+Has 5 siblings
+2) Node #4223 at (l=453.0, t=516.0, r=536.0, b=556.0)px
+Focused = 'false'
+Role = 'Button'
+Text = '[Закрыть]'
+Actions = [OnClick, RequestFocus, SetTextSubstitution, ShowTextSubstitution, ClearTextSubstitution, GetTextLayoutResult]
+MergeDescendants = 'true'
+Has 2 siblings
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:394)
+	at androidx.compose.ui.test.Actions_androidKt.performClickImpl(Actions.android.kt:20)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:54)
+	at org.readerka.FolderWorkspaceUiTest.largeSourceFilterShowsRecentFirstAndSearchesLongTitlesAndAuthors(FolderWorkspaceUiTest.kt:135)
+
+FAILURES!!!
+Tests run: 11,  Failures: 5
+
+
+INSTRUMENTATION_CODE: -1

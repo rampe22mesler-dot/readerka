@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.readerka.MainActivity
 import org.readerka.R
 import org.readerka.data.*
 
@@ -39,6 +40,10 @@ import org.readerka.data.*
     val reader by vm.reader.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val openIds by vm.openDocumentIds.collectAsStateWithLifecycle()
+    val workspace by vm.workspace.collectAsStateWithLifecycle()
+    var commands by remember { mutableStateOf(false) }
+    var sourcesOnly by remember { mutableStateOf(false) }
+    var draftsOpen by remember { mutableStateOf(false) }
     val openDocuments = openIds.mapNotNull { id -> data.documents.firstOrNull { it.id == id } }
     val size = calculateWindowSizeClass(activity)
     val rail = size.widthSizeClass != WindowWidthSizeClass.Compact
@@ -72,7 +77,7 @@ import org.readerka.data.*
         if (fullscreen && screen == "reader") controller.hide(WindowInsetsCompat.Type.systemBars()) else controller.show(WindowInsetsCompat.Type.systemBars())
     }
     BackHandler(screen != "library" || fullscreen || (!wide && sidebar)) {
-        if (!wide && sidebar) sidebar = false else if (fullscreen) fullscreen = false else vm.navigate("library")
+        if (!wide && sidebar) sidebar = false else if (fullscreen) fullscreen = false else if (workspace.editor != null) vm.closeEditor() else vm.navigate("library")
     }
     val colorScheme = if (dark) darkColorScheme(
         primary = Color(0xFFB6A1EE), onPrimary = Color(0xFF261A43), secondary = Color(0xFFB9B2C8),
@@ -87,12 +92,20 @@ import org.readerka.data.*
     val immersive = fullscreen && screen == "reader"
     val importPdf: (String?) -> Unit = { folder -> if (busy == null) { importFolder = folder; import.launch(arrayOf("application/pdf")) } }
     val shortcut: (KeyEvent) -> Boolean = { event ->
-        val recognized = event.isCtrlPressed && event.keyCode in listOf(KeyEvent.KEYCODE_B, KeyEvent.KEYCODE_W, KeyEvent.KEYCODE_TAB)
+        val historyKey = event.isAltPressed && event.keyCode in listOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
+        val recognized = historyKey || (event.isCtrlPressed && event.keyCode in listOf(KeyEvent.KEYCODE_B, KeyEvent.KEYCODE_W, KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_P, KeyEvent.KEYCODE_O, KeyEvent.KEYCODE_N, KeyEvent.KEYCODE_S, KeyEvent.KEYCODE_ENTER) || (event.isCtrlPressed && event.keyCode == KeyEvent.KEYCODE_F && reader != null && screen == "reader"))
         if (recognized && event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_B -> sidebar = !sidebar
-                KeyEvent.KEYCODE_W -> if (busy == null) reader?.document?.id?.let(vm::closeDocument)
-                KeyEvent.KEYCODE_TAB -> if (busy == null && openDocuments.isNotEmpty()) {
+            if (event.keyCode !in listOf(KeyEvent.KEYCODE_P, KeyEvent.KEYCODE_O)) commands = false
+            when {
+                historyKey -> if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) vm.historyBack() else vm.historyForward()
+                event.keyCode == KeyEvent.KEYCODE_F -> vm.requestReaderTool(ReaderTool.Search)
+                event.keyCode == KeyEvent.KEYCODE_P -> { commands = true; sourcesOnly = false }
+                event.keyCode == KeyEvent.KEYCODE_O -> { commands = true; sourcesOnly = true }
+                event.keyCode == KeyEvent.KEYCODE_N -> if (busy == null) vm.newNote(reader?.document?.id?.takeIf { screen == "reader" })
+                event.keyCode in listOf(KeyEvent.KEYCODE_S, KeyEvent.KEYCODE_ENTER) -> { vm.saveEditor() }
+                event.keyCode == KeyEvent.KEYCODE_B -> sidebar = !sidebar
+                event.keyCode == KeyEvent.KEYCODE_W -> if (busy == null) reader?.document?.id?.let(vm::closeDocument)
+                event.keyCode == KeyEvent.KEYCODE_TAB -> if (busy == null && openDocuments.isNotEmpty()) {
                     val index = openDocuments.indexOfFirst { it.id == reader?.document?.id }
                     vm.open(openDocuments[Math.floorMod(index + if (event.isShiftPressed) -1 else 1, openDocuments.size)])
                 }
@@ -100,8 +113,15 @@ import org.readerka.data.*
         }
         recognized
     }
+    val currentShortcut by rememberUpdatedState(shortcut)
+    DisposableEffect(activity) {
+        val main = activity as? MainActivity
+        main?.workspaceShortcut = { currentShortcut(it) }
+        onDispose { main?.workspaceShortcut = null }
+    }
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * preferences.scale)) {
         MaterialTheme(colorScheme = colorScheme) {
+          Box(Modifier.fillMaxSize()) {
             Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
                 if (!immersive) Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column {
@@ -110,6 +130,15 @@ import org.readerka.data.*
                             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                             Text(" / " + stringResource(tabs.firstOrNull { it.first == screen }?.second ?: R.string.library), style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).padding(start = 6.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (rail) IconButton(enabled = workspace.history.canBack && busy == null, onClick = vm::historyBack) { Icon(Icons.Default.KeyboardArrowLeft, stringResource(R.string.history_back)) }
+                            if (rail) IconButton(enabled = workspace.history.canForward && busy == null, onClick = vm::historyForward) { Icon(Icons.Default.KeyboardArrowRight, stringResource(R.string.history_forward)) }
+                            IconButton(onClick = { commands = true; sourcesOnly = false }, modifier = Modifier.testTag("quick-commands")) { Icon(Icons.Default.Search, stringResource(R.string.quick_commands)) }
+                            if (rail) TextButton(onClick = { draftsOpen = true }, modifier = Modifier.testTag("open-drafts")) { Text(stringResource(R.string.drafts) + " (${workspace.drafts.size})") }
+                            else IconButton(onClick = { draftsOpen = true }, modifier = Modifier.testTag("open-drafts")) {
+                                BadgedBox(badge = { if (workspace.drafts.isNotEmpty()) Badge { Text(workspace.drafts.size.toString()) } }) {
+                                    Icon(Icons.Default.Edit, stringResource(R.string.drafts), modifier = Modifier.size(21.dp))
+                                }
+                            }
                             IconButton(onClick = { importPdf(null) }) { Icon(Icons.Default.Add, stringResource(R.string.add_pdf), modifier = Modifier.size(21.dp)) }
                         }
                         HorizontalDivider()
@@ -147,7 +176,7 @@ import org.readerka.data.*
                             }
                             Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { contentWidth = it.width }) {
                                 when (screen) {
-                                    "reader" -> ReaderScreen(reader, data, vm, with(density) { contentWidth.toDp() } >= 820.dp, fullscreen, onFullscreen = { fullscreen = it }, onWorkspaceShortcut = shortcut)
+                                    "reader" -> ReaderScreen(reader, data, vm, with(density) { contentWidth.toDp() } >= 820.dp, fullscreen, onFullscreen = { fullscreen = it }, onWorkspaceShortcut = shortcut, allowPageKeys = !commands && !draftsOpen)
                                     "notes" -> NotesScreen(data, vm, notesFolder, { notesFolder = it }, { sidebar = true }, export)
                                     "settings" -> SettingsScreen(preferences, data, vm, export, { restore.launch(arrayOf("application/zip", "application/octet-stream")) })
                                     else -> LibraryScreen(data, vm, false, importPdf, workspace = true)
@@ -161,6 +190,36 @@ import org.readerka.data.*
                     }
                 }
             }
+            if (draftsOpen) DraftList(workspace.drafts, data, vm) { draftsOpen = false }
+            if (commands) {
+                val items = buildList {
+                    if (!sourcesOnly) {
+                        add(QuickCommand("new-note", "Создать заметку", "Ctrl+N") { vm.newNote(reader?.document?.id?.takeIf { screen == "reader" }) })
+                        add(QuickCommand("save-note", "Сохранить заметку", "Ctrl+S / Ctrl+Enter") { vm.saveEditor() })
+                        add(QuickCommand("drafts", "Открыть черновики") { draftsOpen = true })
+                        add(QuickCommand("library", "Открыть библиотеку") { vm.navigate("library") })
+                        add(QuickCommand("notes", "Открыть каталог заметок") { vm.navigate("notes") })
+                        add(QuickCommand("sidebar", "Показать или скрыть панель папок", "Ctrl+B") { sidebar = !sidebar })
+                        if (reader != null) {
+                            add(QuickCommand("fullscreen", "Полный экран PDF") { vm.navigate("reader"); fullscreen = !fullscreen })
+                            add(QuickCommand("pdf-search", "Поиск по текущему PDF", "Ctrl+F") { vm.requestReaderTool(ReaderTool.Search) })
+                            add(QuickCommand("pdf-quotes", "Открыть цитаты текущего PDF") { vm.requestReaderTool(ReaderTool.Quotes) })
+                            add(QuickCommand("pdf-bookmarks", "Открыть закладки текущего PDF") { vm.requestReaderTool(ReaderTool.Bookmarks) })
+                            add(QuickCommand("pdf-page", "Перейти к странице текущего PDF") { vm.requestReaderTool(ReaderTool.Page) })
+                        }
+                        if (workspace.history.canBack) add(QuickCommand("back", "Назад к месту чтения", "Alt+←") { vm.historyBack() })
+                        if (workspace.history.canForward) add(QuickCommand("forward", "Вперёд к месту чтения", "Alt+→") { vm.historyForward() })
+                        workspace.drafts.forEach { draft -> add(QuickCommand("draft-" + draft.entry.id, draft.entry.title.ifBlank { "Без названия" }, "Черновик · " + draft.entry.comment.take(100)) { vm.resumeDraft(draft) }) }
+                    }
+                    data.documents.sortedByDescending { it.lastOpenedAt }.forEach { document -> add(QuickCommand("source-" + document.id, document.title, "PDF · " + document.authors) { vm.open(document) }) }
+                    if (!sourcesOnly) {
+                        data.bookmarks.forEach { bookmark -> add(QuickCommand("bookmark-" + bookmark.id, bookmark.title, "Закладка · " + (data.documents.firstOrNull { it.id == bookmark.documentId }?.title ?: "") + " · " + (bookmark.page + 1)) { vm.openBookmark(bookmark) }) }
+                        data.entries.filter { it.anchor != null }.forEach { entry -> add(QuickCommand("quote-" + entry.id, entry.title, "Цитата · " + entry.quote.take(150)) { vm.source(entry) }) }
+                    }
+                }
+                QuickCommands(items) { commands = false }
+            }
+          }
         }
     }
 }

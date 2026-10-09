@@ -82,6 +82,12 @@ class ReaderControlsTest {
             block(document, vm, entry)
         } finally {
             compose.runOnUiThread { vm.navigate("library") }
+            compose.waitUntil(30_000) { !vm.editorSaving.value }
+            runBlocking {
+                vm.workspace.value.drafts.filter { it.entry.documentId == id }.forEach { draft ->
+                    compose.runOnUiThread { vm.discardDraft(draft.entry.id) }.join()
+                }
+            }
             runBlocking { dao.deleteEntries(dao.allEntries().filter { it.documentId == id }.map { it.id }); dao.deleteDocument(id) }
             file.delete()
         }
@@ -135,9 +141,11 @@ class ReaderControlsTest {
         compose.waitUntil(30_000) { compose.runOnUiThread { view.highlights.any { it.id == entry.id } } }
         val highlighted = compose.runOnUiThread { view.screenRect(entry.anchor!!.rects.first()) }
         tap(view, highlighted.centerX(), highlighted.centerY())
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("delete-quote").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("delete-quote").performClick()
         compose.onNodeWithTag("confirm-delete").performClick()
         compose.waitUntil(30_000) { runBlocking { dao.allEntries().none { it.id == entry.id } } }
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-editor").fetchSemanticsNodes().isEmpty() }
         assertTrue(runBlocking { dao.allDocuments().any { it.id == document.id } })
         view = pageView(0)
         val text = compose.runOnUiThread { view.pageText!! }
@@ -181,7 +189,7 @@ class ReaderControlsTest {
         } finally { instrumentation.removeMonitor(monitor) }
     }
 
-    @Test fun documentFoldersAndNestedBookmarksAreAvailableDuringReading() = withDocument { document, _, entry ->
+    @Test fun documentFoldersAndNestedBookmarksAreAvailableDuringReading() = withDocument { document, vm, entry ->
         compose.onNodeWithTag("reader-quotes-button").performClick()
         compose.onNodeWithTag("create-root-folder").performClick()
         compose.onNode(hasText("Название") and hasAnyAncestor(isDialog())).performTextInput("Chapter")
@@ -200,13 +208,14 @@ class ReaderControlsTest {
         val view = pageView(0)
         val rect = compose.runOnUiThread { view.screenRect(entry.anchor!!.rects.first()) }
         tap(view, rect.centerX(), rect.centerY())
-        compose.onNodeWithText("Папки цитат в этом PDF", substring = true).performScrollTo().performClick()
+        compose.waitUntil(30_000) { vm.workspace.value.editor?.entry?.id == entry.id }
+        compose.onNodeWithTag("entry-reader-folders", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNode(hasTestTag("expand-folder-" + root.id) and hasAnyAncestor(isDialog())).performClick()
         compose.onNode(hasTestTag("select-folder-" + root.id) and hasAnyAncestor(isDialog())).performClick()
         compose.onNode(hasTestTag("select-folder-" + child.id) and hasAnyAncestor(isDialog())).performClick()
         compose.onNodeWithText("Применить").performClick()
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil(30_000) { runBlocking { dao.allReaderMemberships().count { it.entryId == entry.id } == 2 } }
+        compose.waitUntil(30_000) { runBlocking { dao.allReaderMemberships().count { it.entryId == entry.id } == 2 } && vm.workspace.value.editor == null }
         compose.onNodeWithTag("select-folder-" + root.id).performClick()
         compose.onAllNodesWithText("Saved quotation").assertCountEquals(1)
         compose.onNodeWithTag("reader-bookmarks-button").performClick()

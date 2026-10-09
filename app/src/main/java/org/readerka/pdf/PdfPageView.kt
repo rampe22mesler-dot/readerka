@@ -118,6 +118,7 @@ class PdfPageView(context: Context) : View(context) {
         scaleDetector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                requestFocus()
                 downX = event.x; downY = event.y; lastX = event.x; lastY = event.y
                 val rects = selection()?.second?.rects
                 val handles = listOfNotNull(rects?.firstOrNull(), rects?.lastOrNull())

@@ -42,7 +42,7 @@ private data class Selection(val text: String, val anchor: Anchor, val view: Pdf
 private data class PdfMatch(val text: String, val anchor: Anchor)
 
 @OptIn(FlowPreview::class)
-@Composable fun ReaderScreen(session: ReaderSession?, data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit, onWorkspaceShortcut: (KeyEvent) -> Boolean = { false }) {
+@Composable fun ReaderScreen(session: ReaderSession?, data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit, onWorkspaceShortcut: (KeyEvent) -> Boolean = { false }, allowPageKeys: Boolean = true) {
     if (session == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.no_document_open)) }; return }
     key(session.engine) {
         val list = rememberLazyListState(session.page)
@@ -54,7 +54,11 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         val density = LocalDensity.current
         val scope = rememberCoroutineScope()
         var selection by remember { mutableStateOf<Selection?>(null) }
-        var edited by remember { mutableStateOf<Entry?>(null) }
+        val workspace by vm.workspace.collectAsState()
+        val edited = workspace.editor
+        var editorHasFocus by remember { mutableStateOf(false) }
+        LaunchedEffect(edited?.entry?.id) { if (edited == null) editorHasFocus = false }
+        var positioned by remember(session.token) { mutableStateOf(false) }
         var showPanel by rememberSaveable { mutableStateOf(false) }
         var bookmarksTab by rememberSaveable { mutableStateOf(false) }
         var fitPage by rememberSaveable { mutableStateOf(false) }
@@ -64,7 +68,18 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         var pageInput by remember { mutableStateOf("") }
         var search by remember { mutableStateOf(false) }
         var translation by rememberSaveable { mutableStateOf<String?>(null) }
+        val requestedTool by vm.readerTool.collectAsState()
         val currentPage by remember { derivedStateOf { list.firstVisibleItemIndex.coerceIn(0, session.engine.pageCount - 1) } }
+        LaunchedEffect(requestedTool) {
+            when (requestedTool) {
+                ReaderTool.Search -> search = true
+                ReaderTool.Quotes -> { vm.closeEditor(); showPanel = true; bookmarksTab = false }
+                ReaderTool.Bookmarks -> { vm.closeEditor(); showPanel = true; bookmarksTab = true }
+                ReaderTool.Page -> { pageInput = (currentPage + 1).toString(); jump = true }
+                null -> return@LaunchedEffect
+            }
+            vm.consumeReaderTool()
+        }
         val docEntries = data.entries.filter { it.documentId == session.document.id }
         val docBookmarks = data.bookmarks.filter { it.documentId == session.document.id }
         var viewport by remember { mutableStateOf(IntSize.Zero) }
@@ -82,24 +97,25 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             withFrameNanos { }
             // Remeasurement touches AndroidViews: always return to the Android UI dispatcher
             // after asynchronous PDF dimensions and a frame-clock suspension.
-            withContext(Dispatchers.Main) { list.scrollToItem(session.page, offset) }
+            withContext(Dispatchers.Main) { list.scrollToItem(session.page, offset); positioned = true }
         }
         LaunchedEffect(list, session.engine, fitPage, viewport) {
             if (viewport.width <= 0 || viewport.height <= 0) return@LaunchedEffect
-            snapshotFlow { list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset }.debounce(350).distinctUntilChanged().collect { (page, offset) ->
-                vm.position(session.document, page, (offset / pageHeight(page) * 10_000).toInt().coerceIn(0, 10_000))
-            }
+            snapshotFlow { if (positioned) list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset else null }.filterNotNull()
+                .map { (page, offset) -> page to (offset / pageHeight(page) * 10_000).toInt().coerceIn(0, 10_000) }
+                .distinctUntilChanged().onEach { (page, offset) -> vm.trackPosition(session.document.id, page, offset) }
+                .debounce(350).collect { (page, offset) -> vm.position(session.document, page, offset) }
         }
         fun go(page: Int) {
             selection?.view?.clearSelection(); selection = null
             // A focused native canvas otherwise asks the lazy list to reveal its old item
             // while the explicit page jump is being measured.
             (activity?.currentFocus as? PdfPageView)?.clearFocus()
-            vm.open(session.document, page = page.coerceIn(0, session.engine.pageCount - 1))
+            vm.open(session.document, page = page.coerceIn(0, session.engine.pageCount - 1), recordHistory = false)
         }
         val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
-            if (edited != null || bookmark != null || jump || search || translation != null) false
-            else if (onWorkspaceShortcut(event)) true
+            if (onWorkspaceShortcut(event)) true
+            else if (!allowPageKeys || (edited != null && editorHasFocus) || bookmark != null || jump || search || translation != null) false
             else {
                 val target = when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> currentPage + 1
@@ -135,6 +151,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 IconButton(onClick = {
                     bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = if (session.page == currentPage) session.offset else 0)
                 }) { Icon(Icons.Default.Star, stringResource(R.string.bookmark)) }
+                IconButton(onClick = { vm.newNote(session.document.id); showPanel = false }) { Icon(Icons.Default.Edit, stringResource(R.string.create_note)) }
                 IconButton(onClick = { search = true }) { Icon(Icons.Default.Search, stringResource(R.string.search_pdf)) }
                 TextButton(onClick = { fitPage = !fitPage; go(currentPage) }) { Text(stringResource(if (fitPage) R.string.fit_width else R.string.fit_page)) }
             }
@@ -148,8 +165,8 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                             translation = s.text
                         }) { Text(stringResource(R.string.translate)) }
                         TextButton(onClick = {
-                            edited = Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
-                                documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor)
+                            vm.editEntry(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
+                                documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor)); showPanel = false
                         }) { Text(stringResource(R.string.comment)) }
                         TextButton(onClick = { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text)) }) { Text(stringResource(R.string.copy)) }
                         IconButton(onClick = { s.view.clearSelection(); selection = null }) { Icon(Icons.Default.Close, stringResource(R.string.clear_selection)) }
@@ -160,21 +177,24 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             Row(Modifier.weight(1f)) {
                 if (!wide && showPanel) {
                     ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                        { edited = it }, { vm.source(it); showPanel = false }, { vm.openBookmark(it); showPanel = false }, { showPanel = false }, Modifier.fillMaxSize())
+                        { vm.editEntry(it) }, { vm.source(it); showPanel = false }, { vm.openBookmark(it); showPanel = false }, { showPanel = false }, Modifier.fillMaxSize())
                 } else {
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().onSizeChanged { viewport = it }) {
                         LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("pdf-pages"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(session.engine.pageCount, key = { it }) { index ->
                                 PdfPage(session, index, maxWidth, maxHeight, fitPage, docEntries.filter { it.anchor?.page == index },
                                     { text, anchor, view -> selection?.view?.takeIf { it !== view }?.clearSelection(); selection = Selection(text, anchor, view) },
-                                    { edited = it }, { quickPages = !quickPages }, { keyHandler(it) })
+                                    { vm.editEntry(it) }, { quickPages = !quickPages }, { keyHandler(it) })
                             }
                         }
                     }
-                    if (wide && showPanel) {
+                    if (wide && edited != null) {
+                        VerticalDivider()
+                        DraftEditor(edited, data, vm, inline = true, onEditorFocus = { editorHasFocus = it })
+                    } else if (wide && showPanel) {
                         VerticalDivider()
                         ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                            { edited = it }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(300.dp).fillMaxHeight())
+                            { vm.editEntry(it) }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(300.dp).fillMaxHeight())
                     }
                 }
             }
@@ -188,13 +208,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         if (jump) AlertDialog(onDismissRequest = { jump = false }, title = { Text(stringResource(R.string.jump_to_page)) }, text = { OutlinedTextField(pageInput, { pageInput = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.page_number)) }) },
             confirmButton = { TextButton(enabled = (pageInput.toIntOrNull() ?: 0) in 1..session.engine.pageCount, onClick = { go(pageInput.toInt() - 1); jump = false }) { Text(stringResource(R.string.go)) } }, dismissButton = { TextButton(onClick = { jump = false }) { Text(stringResource(R.string.cancel)) } })
         bookmark?.let { b -> BookmarkEditor(b, data, { bookmark = null }, { vm.saveBookmark(it) }) }
-        edited?.let { e ->
-            EntryEditor(e, data, { edited = null }, { entry, tags, members, readerMembers ->
-                vm.saveEntry(entry, tags, members, readerMembers); selection?.view?.clearSelection(); selection = null
-            }, if (data.entries.any { it.id == e.id }) ({
-                vm.deleteEntries(setOf(e.id)); selection?.view?.clearSelection(); selection = null
-            }) else null)
-        }
+        if (!wide) edited?.let { DraftEditor(it, data, vm) }
         if (search) PdfSearchDialog(session, { search = false }, { anchor -> vm.open(session.document, anchor); search = false })
     }
 }

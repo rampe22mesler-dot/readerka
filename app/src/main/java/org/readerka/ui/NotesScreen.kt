@@ -34,7 +34,7 @@ import java.util.UUID
     var sort by rememberSaveable { mutableStateOf(NoteSort.Newest) }
     var selectedList by rememberSaveable { mutableStateOf(listOf<String>()) }
     val selected = selectedList.toSet()
-    var editor by remember { mutableStateOf<Entry?>(null) }
+    val workspace by vm.workspace.collectAsState()
     var folderEditor by remember { mutableStateOf(false) }
     var createParent by remember { mutableStateOf<String?>(null) }
     var editedFolder by remember { mutableStateOf<FolderItem?>(null) }
@@ -55,7 +55,7 @@ import java.util.UUID
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onShowFolders) { Icon(Icons.Default.Menu, stringResource(R.string.collections)) }
                 Text(folders.firstOrNull { it.id == folder }?.name ?: stringResource(R.string.all_notes), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                Button(onClick = { editor = Entry(UUID.randomUUID().toString(), "", color = vm.preferences.value.defaultColor) }) { Icon(Icons.Default.Add, null); Text(stringResource(R.string.create_note)) }
+                Button(onClick = { vm.newNote() }) { Icon(Icons.Default.Add, null); Text(stringResource(R.string.create_note)) }
             }
             OutlinedTextField(search, { search = it }, label = { Text(stringResource(R.string.search_notes)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -84,12 +84,12 @@ import java.util.UUID
             }
             if (entries.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(if (data.entries.isEmpty()) R.string.empty_notes else R.string.no_search_results)) }
             else LazyColumn(Modifier.weight(1f)) {
-                items(entries, key = { it.id }) { e -> EntryCard(e, data, { editor = e }, { vm.source(e) }, e.id in selected, { selectedList = if (e.id in selected) selectedList - e.id else selectedList + e.id }) }
+                items(entries, key = { it.id }) { e -> EntryCard(e, data, { vm.editEntry(e) }, { vm.source(e) }, e.id in selected, { selectedList = if (e.id in selected) selectedList - e.id else selectedList + e.id }) }
             }
         }
     }
     if (folderEditor) FolderEditor(editedFolder, folders, createParent, { folderEditor = false }, { vm.collection(org.readerka.data.Collection(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, true) })
-    editor?.let { EntryEditor(it, data, { editor = null }, vm::saveEntry) }
+    workspace.editor?.let { DraftEditor(it, data, vm) }
     if (delete) Confirm(R.string.delete_entries_title, R.string.delete_entries_body, { delete = false }, { vm.deleteEntries(selected); selectedList = emptyList(); delete = false })
     if (tagsDialog) AlertDialog(onDismissRequest = { tagsDialog = false }, title = { Text(stringResource(R.string.add_tags)) }, text = { OutlinedTextField(batchTags, { batchTags = it }, label = { Text(stringResource(R.string.tags)) }) },
         confirmButton = { TextButton(onClick = { vm.batch(selected, tags = batchTags); tagsDialog = false; batchTags = "" }) { Text(stringResource(R.string.save)) } }, dismissButton = { TextButton(onClick = { tagsDialog = false }) { Text(stringResource(R.string.cancel)) } })

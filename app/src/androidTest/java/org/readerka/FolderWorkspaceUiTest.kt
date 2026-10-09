@@ -79,6 +79,7 @@ class FolderWorkspaceUiTest {
             assertNull(other.parentId)
             waitSidebar("select-folder-" + other.id)
             compose.onNodeWithText("Создать заметку").performClick()
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("entry-title").performTextInput(title)
             compose.onNodeWithTag("entry-comment").performTextInput("Shared between two branches")
             compose.onNodeWithText("Папки заметок", substring = true).performScrollTo().performClick()
@@ -90,6 +91,7 @@ class FolderWorkspaceUiTest {
             compose.waitUntil(30_000) { runBlocking { dao.allEntries().any { it.title == title } } }
             val entry = runBlocking { dao.allEntries().single { it.title == title } }
             compose.waitUntil(30_000) { runBlocking { dao.allMemberships().count { it.entryId == entry.id } == 2 } }
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-editor").fetchSemanticsNodes().isEmpty() }
             sidebar("select-folder-" + root.id).performClick()
             compose.onNodeWithText(title).assertIsDisplayed()
             savePreview()

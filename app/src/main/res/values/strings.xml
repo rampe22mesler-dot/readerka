@@ -161,7 +161,7 @@
     <string name="workspace_counts">%1$d документов · %2$d записей</string>
     <string name="toggle_sidebar">Показать или скрыть библиотеку</string>
     <string name="close_document">Закрыть вкладку документа</string>
-    <string name="keyboard_shortcuts">Клавиатура при чтении: стрелки и Page Up / Down — страницы; Home / End — начало и конец; Ctrl+B — библиотека; Ctrl+Tab — следующая вкладка; Ctrl+Shift+Tab — предыдущая; Ctrl+W — закрыть вкладку.</string>
+    <string name="keyboard_shortcuts">Клавиатура при чтении: стрелки и Page Up / Down — страницы; Home / End — начало и конец; Ctrl+B — библиотека; Ctrl+Tab — следующая вкладка; Ctrl+Shift+Tab — предыдущая; Ctrl+W — закрыть вкладку; Ctrl+P — команды; Ctrl+O — открыть источник; Ctrl+N — заметка; Ctrl+F — поиск по PDF; Ctrl+S или Ctrl+Enter — сохранить заметку; Alt+← / → — история переходов.</string>
     <string name="reader_hint">Удержание — выделить слово; касание середины — полоса страниц. Стрелки клавиатуры — листать.</string>
     <string name="search_folders">Поиск папок</string>
     <string name="clear_search">Очистить поиск</string>
@@ -177,4 +177,15 @@
     <string name="recent_sources">Недавно открытые</string>
     <string name="other_sources">Остальные источники</string>
     <string name="reset_filters">Сбросить фильтры</string>
+    <string name="close_editor">Закрыть редактор, сохранив черновик</string>
+    <string name="discard_draft">Удалить черновик</string>
+    <string name="discard_draft_body">Несохранённые изменения будут удалены. Сохранённая запись останется в каталоге.</string>
+    <string name="drafts">Черновики</string>
+    <string name="empty_drafts">Незавершённых записей нет</string>
+    <string name="untitled_draft">Без названия</string>
+    <string name="history_back">Назад к месту чтения</string>
+    <string name="history_forward">Вперёд к месту чтения</string>
+    <string name="quick_commands">Быстрые команды</string>
+    <string name="command_search">Команда или название источника</string>
+    <string name="commands_hint">↑ ↓ — выбрать · Enter — открыть · Esc — закрыть</string>
 </resources>

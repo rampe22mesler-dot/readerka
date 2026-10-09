@@ -41,6 +41,7 @@ class LibraryUiTest {
                 compose.waitUntil(30_000) { runBlocking { dao.allCollections().any { it.name == name } } }
             }
             compose.onNodeWithText("Создать заметку").performClick()
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("entry-title").performTextInput(title)
             compose.onNodeWithTag("entry-comment").performTextInput("Независимая мысль о существовании")
             compose.onNodeWithTag("entry-tags").performScrollTo().performTextInput(tagNames.joinToString(", "))
@@ -54,6 +55,7 @@ class LibraryUiTest {
             assertNull(entry.documentId); assertNull(entry.anchor)
             compose.waitUntil(30_000) { runBlocking { dao.allMemberships().count { it.entryId == entry.id } == 2 } }
             assertEquals(2, runBlocking { dao.allEntryTags().count { it.entryId == entry.id } })
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-editor").fetchSemanticsNodes().isEmpty() }
             compose.waitUntil(30_000) { compose.onAllNodesWithContentDescription("Выбрать: $title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithContentDescription("Выбрать: $title").performScrollTo().performClick()
             compose.onNodeWithText("Цвет: Все").performScrollTo().performClick()

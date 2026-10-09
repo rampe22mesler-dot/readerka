@@ -98,41 +98,6 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
     if (delete) Confirm(R.string.delete_folder_title, R.string.delete_folder_body, { delete = false }, { initial?.let { onDelete(it.id) }; onDismiss() })
 }
 
-@Composable fun EntryEditor(entry: Entry, data: LibrarySnapshot, onDismiss: () -> Unit, onSave: (Entry, String, Set<String>, Set<String>) -> Unit, onDelete: (() -> Unit)? = null) {
-    var title by remember(entry.id) { mutableStateOf(entry.title) }
-    var comment by remember(entry.id) { mutableStateOf(entry.comment) }
-    var type by remember(entry.id) { mutableStateOf(entry.type) }
-    var color by remember(entry.id) { mutableStateOf(entry.color) }
-    var tags by remember(entry.id) { mutableStateOf(data.entryTags.filter { it.entryId == entry.id }.mapNotNull { a -> data.tags.firstOrNull { it.id == a.tagId }?.name }.joinToString(", ")) }
-    var members by remember(entry.id) { mutableStateOf(data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet()) }
-    var readerMembers by remember(entry.id) { mutableStateOf(data.readerMemberships.filter { it.entryId == entry.id }.map { it.folderId }.toSet()) }
-    var delete by remember { mutableStateOf(false) }
-    val readerFolders = data.readerFolders.filter { it.documentId == entry.documentId && it.kind == ReaderFolderKind.Quotes }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(if (entry.anchor == null) R.string.standalone_note else R.string.highlights)) },
-        text = { Column(Modifier.fillMaxWidth().heightIn(max = 550.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(title, { title = it }, label = { Text(stringResource(R.string.title)) }, modifier = Modifier.fillMaxWidth().testTag("entry-title"))
-            if (entry.anchor != null) {
-                Text(stringResource(R.string.source_quote), style = MaterialTheme.typography.labelLarge)
-                Text(entry.quote, style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(R.string.source_page, entry.anchor.page + 1), style = MaterialTheme.typography.labelMedium)
-            }
-            OutlinedTextField(comment, { comment = it }, label = { Text(stringResource(if (entry.anchor == null) R.string.note_text else R.string.comment)) }, minLines = 3, modifier = Modifier.fillMaxWidth().testTag("entry-comment"))
-            Choice(stringResource(R.string.type), type, NoteType.entries, { stringResource(it.labelId()) }, { type = it })
-            ColorPalette(color) { color = it }
-            OutlinedTextField(tags, { tags = it }, label = { Text(stringResource(R.string.tags)) }, modifier = Modifier.fillMaxWidth().testTag("entry-tags"))
-            if (entry.documentId != null) {
-                FolderMembershipChoice(stringResource(R.string.folders_in_pdf), readerFolders.map { FolderItem(it.id, it.name, it.parentId) }, readerMembers, { readerMembers = it })
-            }
-            FolderMembershipChoice(stringResource(R.string.collections), data.collections.map { FolderItem(it.id, it.name, it.parentId) }, members, { members = it })
-        } },
-        confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(entry.copy(title = title.trim(), comment = comment, type = type, color = color), tags, members, readerMembers); onDismiss() }) { Text(stringResource(R.string.save)) } },
-        dismissButton = { Row {
-            if (onDelete != null) TextButton(onClick = { delete = true }, modifier = Modifier.testTag("delete-quote")) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        } })
-    if (delete) Confirm(R.string.delete_entries_title, R.string.delete_entries_body, { delete = false }, { onDelete?.invoke(); onDismiss() })
-}
-
 @Composable fun DocumentEditor(document: Document, data: LibrarySnapshot, onDismiss: () -> Unit, onSave: (Document, String) -> Unit) {
     var title by remember { mutableStateOf(document.title) }; var authors by remember { mutableStateOf(document.authors) }
     var year by remember { mutableStateOf(document.year) }; var publisher by remember { mutableStateOf(document.publisher) }
