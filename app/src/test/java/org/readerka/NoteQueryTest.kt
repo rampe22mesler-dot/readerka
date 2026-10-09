@@ -22,6 +22,15 @@ class NoteQueryTest {
         assertEquals(1, NoteQuery(collectionId = "c1").apply(removed).size)
         assertEquals(2, NoteQuery().apply(removed).size)
     }
+    @Test fun parentFolderIncludesDescendantsWithoutDuplicatingMultiAssignedQuote() {
+        val nested = data.copy(collections = data.collections + org.readerka.data.Collection("child", "Раздел", "c1"),
+            memberships = data.memberships + Membership("child", "e1") + Membership("child", "e2"))
+        assertEquals(setOf("e1", "e2"), NoteQuery(collectionId = "c1").apply(nested).map { it.id }.toSet())
+        assertEquals(2, NoteQuery(collectionId = "c1").apply(nested).size)
+        assertEquals(listOf("e1"), NoteQuery(collectionId = "c2").apply(nested).map { it.id })
+        val withoutDirect = nested.copy(memberships = nested.memberships.filterNot { it.collectionId == "c1" })
+        assertEquals(2, NoteQuery(collectionId = "c1").apply(withoutDirect).size)
+    }
     @Test fun cyclicParentChangeIsRejected() {
         assertThrows(IllegalArgumentException::class.java) { FolderTree.validate(listOf("a" to "b", "b" to "a")) }
         assertThrows(IllegalArgumentException::class.java) { FolderTree.validate(listOf("a" to "unknown")) }

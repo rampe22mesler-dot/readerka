@@ -8,7 +8,10 @@ data class NoteQuery(val text: String = "", val collectionId: String? = null, va
         val docs = data.documents.associateBy { it.id }
         val tags = data.tags.associateBy { it.id }
         val entryTags = data.entryTags.groupBy { it.entryId }
-        val members = collectionId?.let { id -> data.memberships.filter { it.collectionId == id }.map { it.entryId }.toSet() }
+        val members = collectionId?.let { id ->
+            val folders = FolderTree.descendants(id, data.collections.map { it.id to it.parentId })
+            data.memberships.filter { it.collectionId in folders }.map { it.entryId }.toSet()
+        }
         val filtered = data.entries.filter { e ->
             val d = docs[e.documentId]
             val assigned = entryTags[e.id].orEmpty()

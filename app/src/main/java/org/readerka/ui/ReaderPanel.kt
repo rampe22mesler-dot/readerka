@@ -30,15 +30,12 @@ import org.readerka.data.*
     val chosen = if (bookmarksTab) bookmarkFolder else quoteFolder
     val selected = chosen?.takeIf { id -> folders.any { it.id == id } }
     var folderEditor by remember { mutableStateOf<FolderItem?>(null) }
+    var createParent by remember { mutableStateOf<String?>(null) }
     var createFolder by remember { mutableStateOf(false) }
     var bookmarkEditor by remember { mutableStateOf<Bookmark?>(null) }
     var deleteBookmark by remember { mutableStateOf<Bookmark?>(null) }
     var deleteEntry by remember { mutableStateOf<Entry?>(null) }
     val folderItems = folders.map { FolderItem(it.id, it.name, it.parentId) }
-    val orderedFolders = FolderTree.ordered(folders, { it.id }, { it.parentId })
-    fun folderLabel(id: String?): String = folders.firstOrNull { it.id == id }?.let {
-        "  ".repeat(FolderTree.depth(it.id, folders.map { f -> f.id to f.parentId })) + it.name
-    }.orEmpty()
     fun included(id: String?): Boolean {
         if (selected == null) return true
         var current = id
@@ -61,13 +58,13 @@ import org.readerka.data.*
             Spacer(Modifier.width(4.dp))
             FilterChip(bookmarksTab, { onTab(true) }, label = { Text(stringResource(R.string.bookmarks)) })
         }
-        Choice(stringResource(R.string.folder), selected, listOf(null) + orderedFolders.map { it.id },
-            { id -> if (id == null) stringResource(if (bookmarksTab) R.string.all_bookmarks_pdf else R.string.all_quotes_pdf) else folderLabel(id) },
-            { if (bookmarksTab) bookmarkFolder = it else quoteFolder = it })
-        Row {
-            TextButton(onClick = { createFolder = true }) { Text(stringResource(R.string.create_folder)) }
-            if (selected != null) IconButton(onClick = { folderEditor = folderItems.first { it.id == selected } }) { Icon(Icons.Default.Edit, stringResource(R.string.edit_folder)) }
+        key(document.id, kind) {
+            FolderBrowser(folderItems, selected, { if (bookmarksTab) bookmarkFolder = it else quoteFolder = it },
+                Modifier.fillMaxWidth().heightIn(min = 150.dp, max = 230.dp).weight(.42f),
+                stringResource(if (bookmarksTab) R.string.all_bookmarks_pdf else R.string.all_quotes_pdf),
+                onCreate = { createParent = it; createFolder = true }, onEdit = { folderEditor = it })
         }
+        HorizontalDivider(Modifier.padding(vertical = 4.dp))
         LazyColumn(Modifier.weight(1f)) {
             if (!bookmarksTab) {
                 if (visibleEntries.isEmpty()) item { Text(stringResource(R.string.no_quotes_pdf), modifier = Modifier.padding(12.dp)) }
@@ -100,7 +97,7 @@ import org.readerka.data.*
             }
         }
     }
-    if (createFolder || folderEditor != null) FolderEditor(folderEditor, folderItems, selected, { createFolder = false; folderEditor = null },
+    if (createFolder || folderEditor != null) FolderEditor(folderEditor, folderItems, createParent, { createFolder = false; folderEditor = null },
         { vm.readerFolder(ReaderFolder(it.id, document.id, kind, it.name, it.parentId)) }, vm::deleteReaderFolder)
     bookmarkEditor?.let { b -> BookmarkEditor(b, data, { bookmarkEditor = null }, { vm.saveBookmark(it) }) }
     deleteBookmark?.let { b -> Confirm(R.string.delete_bookmark_title, R.string.delete_bookmark_body, { deleteBookmark = null }, { vm.deleteBookmark(b.id); deleteBookmark = null }) }
@@ -122,11 +119,10 @@ import org.readerka.data.*
             Text(stringResource(R.string.source_page, bookmark.page + 1))
             OutlinedTextField(title, { title = it }, label = { Text(stringResource(R.string.title)) }, modifier = Modifier.testTag("bookmark-title"))
             OutlinedTextField(comment, { comment = it }, label = { Text(stringResource(R.string.comment)) })
-            Choice(stringResource(R.string.parent_bookmark), parent, listOf(null) + FolderTree.ordered(allowed, { it.id }, { it.parentId?.takeIf { id -> allowed.any { a -> a.id == id } } }).map { it.id },
-                { id -> bookmarks.firstOrNull { it.id == id }?.let { "  ".repeat(FolderTree.depth(it.id, bookmarks.map { b -> b.id to b.parentId })) + it.title } ?: stringResource(R.string.no_parent_bookmark) },
-                { parent = it; if (it != null) folder = bookmarks.first { b -> b.id == it }.folderId })
-            Choice(stringResource(R.string.folder), folder, listOf(null) + FolderTree.ordered(folders, { it.id }, { it.parentId }).map { it.id },
-                { id -> folders.firstOrNull { it.id == id }?.let { "  ".repeat(FolderTree.depth(it.id, folders.map { f -> f.id to f.parentId })) + it.name } ?: stringResource(R.string.no_reader_folder) }, { folder = it })
+            FolderChoice(stringResource(R.string.parent_bookmark), parent,
+                allowed.map { FolderItem(it.id, it.title, it.parentId?.takeIf { id -> allowed.any { b -> b.id == id } }) },
+                stringResource(R.string.no_parent_bookmark), { parent = it; if (it != null) folder = bookmarks.first { b -> b.id == it }.folderId })
+            FolderChoice(stringResource(R.string.folder), folder, folders.map { FolderItem(it.id, it.name, it.parentId) }, stringResource(R.string.no_reader_folder), { folder = it })
         }
     }, confirmButton = {
         TextButton(enabled = title.isNotBlank(), onClick = { onSave(bookmark.copy(title = title.trim(), comment = comment, parentId = parent, folderId = folder)); onDismiss() }) { Text(stringResource(R.string.save)) }

@@ -1,6 +1,50 @@
 package org.readerka.data
 
 object FolderTree {
+    data class Row<T>(val value: T, val depth: Int, val hasChildren: Boolean)
+
+    /** Visible branches only; search reveals matching folders with their ancestor paths. */
+    fun <T> visible(items: List<T>, id: (T) -> String, parent: (T) -> String?, name: (T) -> String,
+        expanded: Set<String>, query: String = ""): List<Row<T>> {
+        validate(items.map { id(it) to parent(it) })
+        val byId = items.associateBy(id)
+        val children = items.groupBy(parent)
+        val matching: Set<String>? = if (query.isBlank()) null else buildSet<String> {
+            for (item in items.filter { name(it).contains(query.trim(), ignoreCase = true) }) {
+                var current: String? = id(item)
+                while (current != null && add(current)) current = byId[current]?.let(parent)
+            }
+        }
+        return buildList {
+            fun visit(parentId: String?, depth: Int) {
+                for (item in children[parentId].orEmpty().sortedBy { name(it).lowercase() }) {
+                    val key = id(item)
+                    if (matching != null && key !in matching) continue
+                    add(Row(item, depth, !children[key].isNullOrEmpty()))
+                    if (matching != null || key in expanded) visit(key, depth + 1)
+                }
+            }
+            visit(null, 0)
+        }
+    }
+
+    fun ancestors(ids: Set<String>, items: List<Pair<String, String?>>): Set<String> {
+        val parents = items.toMap()
+        return buildSet {
+            for (id in ids) {
+                var current = parents[id]
+                while (current != null && add(current)) current = parents[current]
+            }
+        }
+    }
+
+    fun descendants(id: String, items: List<Pair<String, String?>>): Set<String> {
+        val children = items.groupBy({ it.second }, { it.first })
+        return buildSet {
+            fun visit(key: String) { if (add(key)) children[key].orEmpty().forEach(::visit) }
+            visit(id)
+        }
+    }
     /** Reject self-parenting, orphan parents and cycles before any database write. */
     fun validate(items: List<Pair<String, String?>>) {
         val parents = items.toMap()

@@ -46,6 +46,7 @@ import org.readerka.data.*
     val dark = when (preferences.theme) { ThemeMode.System -> isSystemInDarkTheme(); ThemeMode.Dark -> true; ThemeMode.Light -> false }
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var sidebar by rememberSaveable { mutableStateOf(wide) }
+    var notesFolder by rememberSaveable { mutableStateOf<String?>(null) }
     var contentWidth by remember { mutableIntStateOf(0) }
     var importFolder by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
@@ -132,7 +133,7 @@ import org.readerka.data.*
                         }
                     }
                     if (wide && sidebar && !immersive) {
-                        WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, {}, Modifier.width(248.dp).fillMaxHeight())
+                        WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, {}, Modifier.width(248.dp).fillMaxHeight(), screen == "notes", notesFolder, { notesFolder = it })
                         VerticalDivider()
                     }
                     Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -147,7 +148,7 @@ import org.readerka.data.*
                             Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { contentWidth = it.width }) {
                                 when (screen) {
                                     "reader" -> ReaderScreen(reader, data, vm, with(density) { contentWidth.toDp() } >= 820.dp, fullscreen, onFullscreen = { fullscreen = it }, onWorkspaceShortcut = shortcut)
-                                    "notes" -> NotesScreen(data, vm, with(density) { contentWidth.toDp() } >= 1000.dp, export)
+                                    "notes" -> NotesScreen(data, vm, notesFolder, { notesFolder = it }, { sidebar = true }, export)
                                     "settings" -> SettingsScreen(preferences, data, vm, export, { restore.launch(arrayOf("application/zip", "application/octet-stream")) })
                                     else -> LibraryScreen(data, vm, false, importPdf, workspace = true)
                                 }
@@ -155,7 +156,7 @@ import org.readerka.data.*
                         }
                         if (!wide && sidebar && !immersive) {
                             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .30f)).clickable { sidebar = false })
-                            WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, { sidebar = false }, Modifier.width(280.dp).fillMaxHeight())
+                            WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, { sidebar = false }, Modifier.width(280.dp).fillMaxHeight(), screen == "notes", notesFolder, { notesFolder = it })
                         }
                     }
                 }

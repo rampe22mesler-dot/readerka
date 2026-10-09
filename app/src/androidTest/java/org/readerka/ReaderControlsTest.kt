@@ -183,14 +183,14 @@ class ReaderControlsTest {
 
     @Test fun documentFoldersAndNestedBookmarksAreAvailableDuringReading() = withDocument { document, _, entry ->
         compose.onNodeWithTag("reader-quotes-button").performClick()
-        compose.onNodeWithText("Создать папку").performClick()
+        compose.onNodeWithTag("create-root-folder").performClick()
         compose.onNode(hasText("Название") and hasAnyAncestor(isDialog())).performTextInput("Chapter")
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(30_000) { runBlocking { dao.allReaderFolders().any { it.documentId == document.id && it.name == "Chapter" } } }
         val root = runBlocking { dao.allReaderFolders().first { it.documentId == document.id && it.name == "Chapter" } }
-        compose.onNodeWithText("Папка: Все цитаты документа").performClick()
-        compose.onNode(hasText("Chapter") and hasAnyAncestor(isPopup())).performClick()
-        compose.onNodeWithText("Создать папку").performClick()
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("folder-menu-" + root.id).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("folder-menu-" + root.id).performClick()
+        compose.onNodeWithText("Создать подпапку").performClick()
         compose.onNode(hasText("Название") and hasAnyAncestor(isDialog())).performTextInput("Argument")
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(30_000) { runBlocking { dao.allReaderFolders().any { it.documentId == document.id && it.name == "Argument" } } }
@@ -200,9 +200,15 @@ class ReaderControlsTest {
         val view = pageView(0)
         val rect = compose.runOnUiThread { view.screenRect(entry.anchor!!.rects.first()) }
         tap(view, rect.centerX(), rect.centerY())
-        compose.onNode(hasText("  Argument") and hasAnyAncestor(isDialog())).performScrollTo().performClick()
+        compose.onNodeWithText("Папки цитат в этом PDF", substring = true).performScrollTo().performClick()
+        compose.onNode(hasTestTag("expand-folder-" + root.id) and hasAnyAncestor(isDialog())).performClick()
+        compose.onNode(hasTestTag("select-folder-" + root.id) and hasAnyAncestor(isDialog())).performClick()
+        compose.onNode(hasTestTag("select-folder-" + child.id) and hasAnyAncestor(isDialog())).performClick()
+        compose.onNodeWithText("Применить").performClick()
         compose.onNodeWithText("Сохранить").performClick()
-        compose.waitUntil(30_000) { runBlocking { dao.allReaderMemberships().any { it.folderId == child.id && it.entryId == entry.id } } }
+        compose.waitUntil(30_000) { runBlocking { dao.allReaderMemberships().count { it.entryId == entry.id } == 2 } }
+        compose.onNodeWithTag("select-folder-" + root.id).performClick()
+        compose.onAllNodesWithText("Saved quotation").assertCountEquals(1)
         compose.onNodeWithTag("reader-bookmarks-button").performClick()
         compose.onNodeWithContentDescription("Добавить закладку").performClick()
         compose.onNodeWithTag("bookmark-title").performTextClearance()
@@ -217,7 +223,7 @@ class ReaderControlsTest {
         compose.onNodeWithTag("bookmark-title").performTextClearance()
         compose.onNodeWithTag("bookmark-title").performTextInput("Nested return")
         compose.onNodeWithText("Вложить в закладку: Без родительской закладки").performClick()
-        compose.onNode(hasText("Return to start") and hasAnyAncestor(isPopup())).performClick()
+        compose.onNode(hasTestTag("select-folder-" + parent.id) and hasAnyAncestor(isDialog())).performClick()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(30_000) { runBlocking { dao.allBookmarks().any { it.documentId == document.id && it.title == "Nested return" } } }
         val nested = runBlocking { dao.allBookmarks().first { it.documentId == document.id && it.title == "Nested return" } }
@@ -227,7 +233,7 @@ class ReaderControlsTest {
         compose.onNodeWithTag("reader-bookmark-" + nested.id).performClick(); waitPage(1)
         compose.activityRule.scenario.recreate()
         waitPage(1)
-        assertEquals(child.id, runBlocking { dao.allReaderMemberships().single { it.entryId == entry.id }.folderId })
+        assertEquals(setOf(root.id, child.id), runBlocking { dao.allReaderMemberships().filter { it.entryId == entry.id }.map { it.folderId }.toSet() })
         assertEquals(parent.id, runBlocking { dao.allBookmarks().first { it.id == nested.id }.parentId })
     }
 }

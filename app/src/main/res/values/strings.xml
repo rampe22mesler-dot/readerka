@@ -163,4 +163,18 @@
     <string name="close_document">Закрыть вкладку документа</string>
     <string name="keyboard_shortcuts">Клавиатура при чтении: стрелки и Page Up / Down — страницы; Home / End — начало и конец; Ctrl+B — библиотека; Ctrl+Tab — следующая вкладка; Ctrl+Shift+Tab — предыдущая; Ctrl+W — закрыть вкладку.</string>
     <string name="reader_hint">Удержание — выделить слово; касание середины — полоса страниц. Стрелки клавиатуры — листать.</string>
+    <string name="search_folders">Поиск папок</string>
+    <string name="clear_search">Очистить поиск</string>
+    <string name="create_subfolder">Создать подпапку</string>
+    <string name="folder_actions">Действия с папкой</string>
+    <string name="expand_folder">Развернуть папку</string>
+    <string name="collapse_folder">Свернуть папку</string>
+    <string name="folder_count">Выбрано: %1$d</string>
+    <string name="multiple_folders_hint">Отметьте нужные папки. Одна цитата может находиться сразу в нескольких папках.</string>
+    <string name="apply_selection">Применить</string>
+    <string name="search_sources">Поиск источников</string>
+    <string name="search_tags">Поиск тегов</string>
+    <string name="recent_sources">Недавно открытые</string>
+    <string name="other_sources">Остальные источники</string>
+    <string name="reset_filters">Сбросить фильтры</string>
 </resources>

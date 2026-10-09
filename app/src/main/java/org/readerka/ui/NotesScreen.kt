@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,10 +23,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
-@Composable fun NotesScreen(data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, onExport: (ExportKind, Set<String>?) -> Unit) {
-    var folder by rememberSaveable { mutableStateOf<String?>(null) }
+@Composable fun NotesScreen(data: LibrarySnapshot, vm: LibraryViewModel, folder: String?, onFolder: (String?) -> Unit, onShowFolders: () -> Unit, onExport: (ExportKind, Set<String>?) -> Unit) {
     var search by rememberSaveable { mutableStateOf("") }
-    var showFolders by rememberSaveable { mutableStateOf(false) }
     var filterDialog by remember { mutableStateOf(false) }
     var type by rememberSaveable { mutableStateOf<NoteType?>(null) }
     var color by rememberSaveable { mutableStateOf<Marker?>(null) }
@@ -36,6 +36,7 @@ import java.util.UUID
     val selected = selectedList.toSet()
     var editor by remember { mutableStateOf<Entry?>(null) }
     var folderEditor by remember { mutableStateOf(false) }
+    var createParent by remember { mutableStateOf<String?>(null) }
     var editedFolder by remember { mutableStateOf<FolderItem?>(null) }
     var delete by remember { mutableStateOf(false) }
     var tagsDialog by remember { mutableStateOf(false) }
@@ -45,17 +46,14 @@ import java.util.UUID
     val entries = remember(data, search, folder, source, type, color, tag, dateMillis, sort) { NoteQuery(search, folder, source, type, color, tag, dateMillis, sort).apply(data) }
     LaunchedEffect(data) {
         selectedList = selectedList.filter { id -> data.entries.any { it.id == id } }
-        if (folder != null && folders.none { it.id == folder }) folder = null
+        if (source != null && data.documents.none { it.id == source }) source = null
+        if (tag != null && data.tags.none { it.id == tag }) tag = null
+        if (folder != null && folders.none { it.id == folder }) onFolder(null)
     }
     Row(Modifier.fillMaxSize()) {
-        if (wide || showFolders) {
-            FolderPanel(R.string.my_collections, R.string.all_notes, folders, folder, { folder = it; if (!wide) showFolders = false },
-                { editedFolder = null; folderEditor = true }, { editedFolder = it; folderEditor = true }, Modifier.width(if (wide) 240.dp else 200.dp).fillMaxHeight())
-            VerticalDivider()
-        }
         Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!wide) IconButton(onClick = { showFolders = !showFolders }) { Icon(Icons.Default.Menu, stringResource(R.string.collections)) }
+                IconButton(onClick = onShowFolders) { Icon(Icons.Default.Menu, stringResource(R.string.collections)) }
                 Text(folders.firstOrNull { it.id == folder }?.name ?: stringResource(R.string.all_notes), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                 Button(onClick = { editor = Entry(UUID.randomUUID().toString(), "", color = vm.preferences.value.defaultColor) }) { Icon(Icons.Default.Add, null); Text(stringResource(R.string.create_note)) }
             }
@@ -63,7 +61,7 @@ import java.util.UUID
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { filterDialog = true }) { Text(stringResource(R.string.filter)) }
                 Choice(stringResource(R.string.sort), sort, NoteSort.entries, { stringResource(it.labelId()) }, { sort = it })
-                if (!wide) TextButton(onClick = { editedFolder = null; folderEditor = true }) { Text(stringResource(R.string.create_folder)) }
+                TextButton(onClick = { createParent = folder; editedFolder = null; folderEditor = true }) { Text(stringResource(R.string.create_folder)) }
                 var exporting by remember { mutableStateOf(false) }
                 Box {
                     TextButton(onClick = { exporting = true }) { Text(stringResource(R.string.export_selected)) }
@@ -75,8 +73,8 @@ import java.util.UUID
             if (selected.isNotEmpty()) {
                 Text(stringResource(R.string.selected_count, selected.size), style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Choice<String?>(stringResource(R.string.add_to_collection), null, data.collections.map { it.id }, { id -> data.collections.firstOrNull { it.id == id }?.name ?: stringResource(R.string.any_value) }, { id -> id?.let { vm.batch(selected, collection = it) } })
-                    if (folder != null) TextButton(onClick = { vm.removeFromCollection(folder!!, selected) }) { Text(stringResource(R.string.remove_from_collection)) }
+                    FolderMembershipChoice(stringResource(R.string.add_to_collection), folders, emptySet(), { ids -> ids.forEach { vm.batch(selected, collection = it) } }, Modifier.width(230.dp))
+                    if (folder != null) TextButton(onClick = { vm.removeFromCollection(folder, selected) }) { Text(stringResource(R.string.remove_from_collection)) }
                     Choice<NoteType?>(stringResource(R.string.type), null, NoteType.entries, { it?.let { stringResource(it.labelId()) } ?: stringResource(R.string.any_value) }, { vm.batch(selected, type = it) })
                     Choice<Marker?>(stringResource(R.string.color), null, Marker.entries, { it?.let { stringResource(it.labelId()) } ?: stringResource(R.string.any_value) }, { vm.batch(selected, color = it) })
                     TextButton(onClick = { tagsDialog = true }) { Text(stringResource(R.string.add_tags)) }
@@ -90,18 +88,23 @@ import java.util.UUID
             }
         }
     }
-    if (folderEditor) FolderEditor(editedFolder, folders, folder, { folderEditor = false }, { vm.collection(org.readerka.data.Collection(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, true) })
+    if (folderEditor) FolderEditor(editedFolder, folders, createParent, { folderEditor = false }, { vm.collection(org.readerka.data.Collection(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, true) })
     editor?.let { EntryEditor(it, data, { editor = null }, vm::saveEntry) }
     if (delete) Confirm(R.string.delete_entries_title, R.string.delete_entries_body, { delete = false }, { vm.deleteEntries(selected); selectedList = emptyList(); delete = false })
     if (tagsDialog) AlertDialog(onDismissRequest = { tagsDialog = false }, title = { Text(stringResource(R.string.add_tags)) }, text = { OutlinedTextField(batchTags, { batchTags = it }, label = { Text(stringResource(R.string.tags)) }) },
         confirmButton = { TextButton(onClick = { vm.batch(selected, tags = batchTags); tagsDialog = false; batchTags = "" }) { Text(stringResource(R.string.save)) } }, dismissButton = { TextButton(onClick = { tagsDialog = false }) { Text(stringResource(R.string.cancel)) } })
     if (filterDialog) AlertDialog(onDismissRequest = { filterDialog = false }, title = { Text(stringResource(R.string.filter)) }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.heightIn(max = 530.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FolderChoice(stringResource(R.string.folder), folder, folders, stringResource(R.string.all_notes), onFolder)
             Choice(stringResource(R.string.type), type, listOf(null) + NoteType.entries, { it?.let { stringResource(it.labelId()) } ?: stringResource(R.string.any_value) }, { type = it })
             Choice(stringResource(R.string.color), color, listOf(null) + Marker.entries, { it?.let { stringResource(it.labelId()) } ?: stringResource(R.string.any_value) }, { color = it })
-            Choice(stringResource(R.string.source), source, listOf(null) + data.documents.map { it.id }, { id -> data.documents.firstOrNull { it.id == id }?.title ?: stringResource(R.string.any_value) }, { source = it })
-            Choice(stringResource(R.string.tag), tag, listOf(null) + data.tags.map { it.id }, { id -> data.tags.firstOrNull { it.id == id }?.name ?: stringResource(R.string.any_value) }, { tag = it })
+            val recentIds = data.documents.filter { it.lastOpenedAt > 0 }.sortedByDescending { it.lastOpenedAt }.take(5).map { it.id }.toSet()
+            val sources = data.documents.sortedWith(compareByDescending<Document> { it.id in recentIds }.thenByDescending { if (it.id in recentIds) it.lastOpenedAt else 0 }.thenBy { it.title.lowercase() })
+                .map { SearchOption(it.id, it.title, it.authors, it.id in recentIds) }
+            SearchChoice(stringResource(R.string.source), source, sources, stringResource(R.string.search_sources), { source = it })
+            SearchChoice(stringResource(R.string.tag), tag, data.tags.sortedBy { it.name.lowercase() }.map { SearchOption(it.id, it.name) }, stringResource(R.string.search_tags), { tag = it })
             OutlinedTextField(date, { date = it }, label = { Text(stringResource(R.string.created_after)) }, isError = date.isNotBlank() && dateMillis == null, supportingText = { if (date.isNotBlank() && dateMillis == null) Text(stringResource(R.string.invalid_date)) })
+            TextButton(onClick = { onFolder(null); type = null; color = null; source = null; tag = null; date = "" }) { Text(stringResource(R.string.reset_filters)) }
         }
     }, confirmButton = { TextButton(enabled = date.isBlank() || dateMillis != null, onClick = { filterDialog = false }) { Text(stringResource(R.string.close)) } })
 }

@@ -22,6 +22,7 @@ import org.readerka.data.*
     var recent by rememberSaveable { mutableStateOf(true) }
     var foldersVisible by rememberSaveable { mutableStateOf(false) }
     var folderDialog by remember { mutableStateOf(false) }
+    var createParent by remember { mutableStateOf<String?>(null) }
     var editedFolder by remember { mutableStateOf<FolderItem?>(null) }
     var editedDocument by remember { mutableStateOf<Document?>(null) }
     val folders = data.documentFolders.map { FolderItem(it.id, it.name, it.parentId) }
@@ -36,7 +37,7 @@ import org.readerka.data.*
     Row(Modifier.fillMaxSize()) {
         if (!workspace && (wide || foldersVisible)) {
             FolderPanel(R.string.my_document_folders, R.string.all_documents, folders, folder,
-                { folder = it; if (!wide) foldersVisible = false }, { editedFolder = null; folderDialog = true },
+                { folder = it; if (!wide) foldersVisible = false }, { createParent = it; editedFolder = null; folderDialog = true },
                 { editedFolder = it; folderDialog = true }, Modifier.width(if (wide) 240.dp else 200.dp).fillMaxHeight())
             VerticalDivider()
         }
@@ -50,7 +51,7 @@ import org.readerka.data.*
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(recent, { recent = !recent }, label = { Text(stringResource(R.string.sort_recent)) })
                 Spacer(Modifier.width(8.dp))
-                if (!workspace && !wide) TextButton(onClick = { editedFolder = null; folderDialog = true }) { Text(stringResource(R.string.create_folder)) }
+                if (!workspace && !wide) TextButton(onClick = { createParent = folder; editedFolder = null; folderDialog = true }) { Text(stringResource(R.string.create_folder)) }
             }
             if (docs.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(if (data.documents.isEmpty()) R.string.empty_library else R.string.no_search_results), style = MaterialTheme.typography.titleMedium) }
             else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -70,6 +71,6 @@ import org.readerka.data.*
             }
         }
     }
-    if (folderDialog) FolderEditor(editedFolder, folders, folder, { folderDialog = false }, { vm.folder(DocumentFolder(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, false) })
+    if (folderDialog) FolderEditor(editedFolder, folders, createParent, { folderDialog = false }, { vm.folder(DocumentFolder(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, false) })
     editedDocument?.let { DocumentEditor(it, data, { editedDocument = null }, vm::saveDocument) }
 }

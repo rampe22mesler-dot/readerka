@@ -44,7 +44,9 @@ class LibraryUiTest {
             compose.onNodeWithTag("entry-title").performTextInput(title)
             compose.onNodeWithTag("entry-comment").performTextInput("Независимая мысль о существовании")
             compose.onNodeWithTag("entry-tags").performScrollTo().performTextInput(tagNames.joinToString(", "))
+            compose.onNodeWithText("Папки заметок", substring = true).performScrollTo().performClick()
             for (name in names) compose.onNode(hasText(name) and hasAnyAncestor(isDialog())).performScrollTo().performClick()
+            compose.onNodeWithText("Применить").performClick()
             compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(30_000) { runBlocking { dao.allEntries().any { it.title == title } } }
             val entry = runBlocking { dao.allEntries().single { it.title == title } }

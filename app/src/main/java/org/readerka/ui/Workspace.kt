@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.readerka.R
@@ -27,7 +28,11 @@ private sealed interface TreeRow {
     data class Pdf(val value: Document, val depth: Int) : TreeRow
 }
 
-@Composable fun WorkspaceSidebar(data: LibrarySnapshot, active: String?, vm: LibraryViewModel, onImport: (String?) -> Unit, onOpened: () -> Unit, modifier: Modifier = Modifier) {
+@Composable fun WorkspaceSidebar(data: LibrarySnapshot, active: String?, vm: LibraryViewModel, onImport: (String?) -> Unit, onOpened: () -> Unit, modifier: Modifier = Modifier, notes: Boolean = false, selectedCollection: String? = null, onCollection: (String?) -> Unit = {}) {
+    if (notes) {
+        CollectionSidebar(data, vm, selectedCollection, { onCollection(it); onOpened() }, modifier)
+        return
+    }
     var expanded by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var create by remember { mutableStateOf(false) }
     var edited by remember { mutableStateOf<FolderItem?>(null) }
@@ -56,7 +61,7 @@ private sealed interface TreeRow {
             Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.workspace_files), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = { onImport(parent) }) { Icon(Icons.Default.Add, stringResource(R.string.add_pdf), modifier = Modifier.size(20.dp)) }
-                IconButton(onClick = { create = true; edited = null }) { Icon(Icons.Default.Create, stringResource(R.string.create_folder), modifier = Modifier.size(20.dp)) }
+                IconButton(onClick = { parent = null; create = true; edited = null }) { Icon(painterResource(R.drawable.ic_folder), stringResource(R.string.create_folder), modifier = Modifier.size(20.dp)) }
             }
             HorizontalDivider()
             Row(Modifier.fillMaxWidth().clickable { vm.navigate("library"); onOpened() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -73,7 +78,14 @@ private sealed interface TreeRow {
                         }.padding(start = (8 + row.depth * 14).coerceAtMost(78).dp).testTag("workspace-folder-" + row.value.id), verticalAlignment = Alignment.CenterVertically) {
                             Icon(if (row.value.id in expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight, null, modifier = Modifier.size(18.dp))
                             Text(row.value.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(vertical = 12.dp))
-                            IconButton(onClick = { edited = FolderItem(row.value.id, row.value.name, row.value.parentId); create = true }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Edit, stringResource(R.string.edit_folder), modifier = Modifier.size(16.dp)) }
+                            var actions by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { actions = true }, modifier = Modifier.size(40.dp).testTag("workspace-folder-menu-" + row.value.id)) { Icon(Icons.Default.MoreVert, stringResource(R.string.folder_actions), modifier = Modifier.size(16.dp)) }
+                                DropdownMenu(actions, { actions = false }) {
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.create_subfolder)) }, onClick = { actions = false; parent = row.value.id; edited = null; create = true; expanded = (expanded + row.value.id).distinct() })
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.edit_folder)) }, onClick = { actions = false; edited = FolderItem(row.value.id, row.value.name, row.value.parentId); create = true })
+                                }
+                            }
                         }
                         is TreeRow.Pdf -> Row(Modifier.padding(horizontal = 6.dp, vertical = 1.dp).fillMaxWidth()
                             .background(if (active == row.value.id) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(6.dp))
@@ -90,6 +102,18 @@ private sealed interface TreeRow {
         }
     }
     if (create) FolderEditor(edited, folders, parent, { create = false }, { vm.folder(DocumentFolder(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, false) })
+}
+
+@Composable private fun CollectionSidebar(data: LibrarySnapshot, vm: LibraryViewModel, selected: String?, onSelect: (String?) -> Unit, modifier: Modifier) {
+    var create by remember { mutableStateOf(false) }
+    var edited by remember { mutableStateOf<FolderItem?>(null) }
+    var parent by remember { mutableStateOf<String?>(null) }
+    val folders = data.collections.map { FolderItem(it.id, it.name, it.parentId) }
+    Surface(modifier.testTag("workspace-sidebar"), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        FolderPanel(R.string.my_collections, R.string.all_notes, folders, selected, onSelect,
+            { parent = it; edited = null; create = true }, { edited = it; create = true }, Modifier.fillMaxSize())
+    }
+    if (create) FolderEditor(edited, folders, parent, { create = false }, { vm.collection(org.readerka.data.Collection(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, true) })
 }
 
 @Composable fun DocumentTabs(documents: List<Document>, selected: String?, enabled: Boolean, onOpen: (Document) -> Unit, onClose: (String) -> Unit) {
