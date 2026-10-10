@@ -1,0 +1,16 @@
+Readerka 0.7.0 Preview — APK / in-place upgrade verification
+Package: org.readerka.preview
+versionCode: 7
+versionName: 0.7.0-preview
+minSdk: 28; targetSdk: 35
+Signature verified by Android build-tools 35 apksigner.
+Certificate SHA-256: 5b8ed068c6ad5a5377f6e19f613f0d943b597c98a99cf895d93de651df450dd7
+APK SHA-256: 752e5359262fb012f7e24a3e6f1ac3cd4b5ad4683e3d63439259acd91ffe6f26
+
+Upgrade procedure: install the published 0.6.0 Preview APK, seed its real Room 2 database with an existing Summary/Green note, then install the new APK with adb install -r.
+Before upgrade: versionCode 6, userId 10089, Room schema 2.
+After upgrade and final test run: versionCode 7, userId 10089, Room schema 3.
+Retained row: id=upgrade-060-fixture, title=Existing Preview note, comment=Retained text, type=Summary, color=Green, kind=Note.
+The original org.readerka 0.5 signing key is unavailable; this Preview APK updates org.readerka.preview 0.6, not the original org.readerka application.
+Private repository downloads require an authorized GitHub session on the APK blob page.
+Physical Huawei MatePad was not available for testing.

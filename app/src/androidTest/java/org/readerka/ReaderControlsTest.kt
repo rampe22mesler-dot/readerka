@@ -212,6 +212,7 @@ class ReaderControlsTest {
         val rect = compose.runOnUiThread { view.screenRect(entry.anchor!!.rects.first()) }
         tap(view, rect.centerX(), rect.centerY())
         compose.waitUntil(30_000) { vm.workspace.value.editor?.entry?.id == entry.id }
+        compose.onNodeWithTag("note-properties").performClick()
         compose.onNodeWithTag("entry-reader-folders", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNode(hasTestTag("expand-folder-" + root.id) and hasAnyAncestor(isDialog())).performClick()
         compose.onNode(hasTestTag("select-folder-" + root.id) and hasAnyAncestor(isDialog())).performClick()
@@ -219,6 +220,9 @@ class ReaderControlsTest {
         compose.onNodeWithText("Применить").performClick()
         compose.onNodeWithText("Сохранить").performClick()
         compose.waitUntil(30_000) { runBlocking { dao.allReaderMemberships().count { it.entryId == entry.id } == 2 } && vm.workspace.value.editor == null }
+        val notePane = vm.workspace.value.activePane
+        val noteTab = vm.workspace.value.panes[notePane].selected!!
+        compose.onNodeWithTag("close-tab-${noteTab.id}").performClick()
         compose.onNodeWithTag("select-folder-" + root.id).performClick()
         compose.onAllNodesWithText("Saved quotation").assertCountEquals(1)
         compose.onNodeWithTag("reader-bookmarks-button").performClick()

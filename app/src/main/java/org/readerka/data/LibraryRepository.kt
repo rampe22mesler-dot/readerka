@@ -10,12 +10,14 @@ import kotlinx.coroutines.withContext
 import org.readerka.pdf.PdfEngine
 import java.io.File
 import java.util.UUID
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class LibraryRepository(val context: Context, val database: LibraryDatabase, pdfRoot: File = File(context.filesDir, "pdfs")) {
     val dao = database.dao()
     val pdfDirectory = pdfRoot.apply { mkdirs() }
     val snapshots = database.invalidationTracker.createFlow(
-        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks", "reader_folders", "reader_memberships"
+        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks", "reader_folders", "reader_memberships", "note_versions"
     ).map { dao.snapshot() }
     fun pdfFile(document: Document): File {
         require(document.storedName.matches(Regex("[A-Za-z0-9_-]+\\.pdf"))) { "Unsafe PDF name" }
@@ -45,6 +47,12 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
             val folders = dao.allReaderFolders().associateBy { it.id }
             require(readerFolderIds.all { folders[it]?.let { f -> f.documentId == entry.documentId && f.kind == ReaderFolderKind.Quotes } == true })
         }
+        require(entry.sources.distinct().size == entry.sources.size && entry.sources.all { id -> dao.allDocuments().any { it.id == id } })
+        val previous = dao.allEntries().firstOrNull { it.id == entry.id }
+        if (previous != null && previous.copy(updatedAt = entry.updatedAt) != entry) {
+            val newest = dao.allNoteVersions().firstOrNull { it.entryId == entry.id }
+            if (newest == null || System.currentTimeMillis() - newest.createdAt >= 30_000 || kotlin.math.abs(previous.comment.length - entry.comment.length) >= 200) checkpoint(previous, "До изменения")
+        }
         dao.putEntry(entry.copy(updatedAt = System.currentTimeMillis()))
         dao.clearEntryTags(entry.id)
         for (tag in resolveTags(tagNames)) dao.putEntryTag(EntryTag(entry.id, tag.id))
@@ -54,6 +62,15 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
             dao.clearReaderMemberships(entry.id)
             for (id in readerFolderIds) dao.putReaderMembership(ReaderMembership(id, entry.id))
         }
+    }
+    suspend fun checkpoint(entry: Entry, label: String) {
+        val data = dao.snapshot()
+        val draft = EntryDraft(entry,
+            data.entryTags.filter { it.entryId == entry.id }.mapNotNull { link -> data.tags.firstOrNull { it.id == link.tagId }?.name }.joinToString(", "),
+            data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet(),
+            data.readerMemberships.filter { it.entryId == entry.id }.map { it.folderId }.toSet())
+        dao.putNoteVersion(NoteVersion(UUID.randomUUID().toString(), entry.id, Json.encodeToString(draft), System.currentTimeMillis(), label))
+        dao.pruneVersions(entry.id)
     }
     suspend fun saveReaderFolder(folder: ReaderFolder) = database.withTransaction {
         require(folder.name.isNotBlank())

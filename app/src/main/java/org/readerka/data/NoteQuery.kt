@@ -15,10 +15,10 @@ data class NoteQuery(val text: String = "", val collectionId: String? = null, va
         val filtered = data.entries.filter { e ->
             val d = docs[e.documentId]
             val assigned = entryTags[e.id].orEmpty()
-            (members == null || e.id in members) && (documentId == null || e.documentId == documentId) &&
+            (members == null || e.id in members) && (documentId == null || documentId in e.sourceBooks()) &&
                 (type == null || e.type == type) && (color == null || e.color == color) &&
                 (tagId == null || assigned.any { it.tagId == tagId }) && (createdAfter == null || e.createdAt >= createdAfter) &&
-                (text.isBlank() || listOf(e.title, e.quote, e.comment, d?.title.orEmpty(), d?.authors.orEmpty(), assigned.mapNotNull { tags[it.tagId]?.name }.joinToString(" ")).any { it.contains(text.trim(), ignoreCase = true) })
+                (text.isBlank() || listOf(e.title, e.quote, e.content?.text ?: e.comment, d?.title.orEmpty(), d?.authors.orEmpty(), data.documents.filter { it.id in e.sourceBooks() }.joinToString(" ") { it.title + " " + it.authors }, assigned.mapNotNull { tags[it.tagId]?.name }.joinToString(" ")).any { it.contains(text.trim(), ignoreCase = true) })
         }
         return when (sort) {
             NoteSort.Newest -> filtered.sortedByDescending { it.createdAt }

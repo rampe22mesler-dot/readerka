@@ -148,10 +148,11 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
                     }
                 }
                 if (entry.quote.isNotBlank()) Text(entry.quote, style = MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
-                if (entry.comment.isNotBlank()) Text(entry.comment, style = MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+                if (entry.comment.isNotBlank()) Text(entry.content?.text ?: entry.comment, style = MaterialTheme.typography.bodyMedium, maxLines = if (compact) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
                 if (document != null) Text(listOf(document.authors, document.title).filter { it.isNotBlank() }.joinToString(" — "), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (entry.kind == EntryKind.Consp) Text(data.documents.filter { it.id in entry.sourceBooks() }.joinToString(" · ") { it.title }.ifBlank { "Тематический конспект" }, style = MaterialTheme.typography.labelMedium)
                 entry.anchor?.let { Text(stringResource(R.string.source_page, it.page + 1), style = MaterialTheme.typography.labelMedium) }
-                Text(stringResource(entry.type.labelId()) + if (tagNames.isEmpty()) "" else " · " + tagNames.joinToString(" ") { "#$it" }, style = MaterialTheme.typography.labelMedium)
+                Text((if (entry.kind == EntryKind.Consp) "Конспект" else stringResource(entry.type.labelId())) + if (tagNames.isEmpty()) "" else " · " + tagNames.joinToString(" ") { "#$it" }, style = MaterialTheme.typography.labelMedium)
                 if (folderNames.isNotEmpty()) Text(folderNames.joinToString(" · "), style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (!compact) Row {
                     TextButton(onClick = onEdit) { Text(stringResource(R.string.edit)) }

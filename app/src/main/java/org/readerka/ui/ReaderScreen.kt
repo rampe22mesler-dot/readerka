@@ -57,6 +57,9 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         val workspace by vm.workspace.collectAsState()
         var positioned by remember(session.token) { mutableStateOf(false) }
         var showPanel by rememberSaveable { mutableStateOf(false) }
+        var conspTab by rememberSaveable { mutableStateOf(false) }
+        var createConsp by remember { mutableStateOf(false) }
+        var addConsp by remember { mutableStateOf<Selection?>(null) }
         var bookmarksTab by rememberSaveable { mutableStateOf(false) }
         var fitPage by rememberSaveable { mutableStateOf(false) }
         var quickPages by rememberSaveable { mutableStateOf(false) }
@@ -72,14 +75,15 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             if (!allowPageKeys) return@LaunchedEffect
             when (requestedTool) {
                 ReaderTool.Search -> search = true
-                ReaderTool.Quotes -> { showPanel = true; bookmarksTab = false }
-                ReaderTool.Bookmarks -> { showPanel = true; bookmarksTab = true }
+                ReaderTool.Quotes -> { showPanel = true; bookmarksTab = false; conspTab = false }
+                ReaderTool.Bookmarks -> { showPanel = true; bookmarksTab = true; conspTab = false }
+                ReaderTool.Consp -> { showPanel = true; conspTab = true }
                 ReaderTool.Page -> { pageInput = (currentPage + 1).toString(); jump = true }
                 null -> return@LaunchedEffect
             }
             vm.consumeReaderTool()
         }
-        val docEntries = data.entries.filter { it.documentId == session.document.id }
+        val docEntries = data.entries.filter { it.documentId == session.document.id && it.kind != EntryKind.Consp }
         val docBookmarks = data.bookmarks.filter { it.documentId == session.document.id }
         var viewport by remember { mutableStateOf(IntSize.Zero) }
         suspend fun pageHeight(index: Int): Float {
@@ -115,13 +119,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
             if (!allowPageKeys || bookmark != null || jump || search || translation != null) false
             else {
-                val target = when (event.keyCode) {
-                    KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> currentPage + 1
-                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_UP -> currentPage - 1
-                    KeyEvent.KEYCODE_MOVE_HOME -> 0
-                    KeyEvent.KEYCODE_MOVE_END -> session.engine.pageCount - 1
-                    else -> null
-                }
+                val target = AppShortcuts.pdfKeys[event.keyCode]?.let { when (it) { Int.MIN_VALUE -> 0; Int.MAX_VALUE -> session.engine.pageCount - 1; else -> currentPage + it } }
                 if (target == null || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) false
                 else { if (event.action == KeyEvent.ACTION_DOWN) go(target); true }
             }
@@ -143,7 +141,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                             vm.editBeside(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
                                 documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor), session.pane)
                         }) { Text(stringResource(R.string.comment)) }
-                        TextButton(onClick = { vm.focusPane(session.pane); vm.insertQuote(s.text, session.document, s.anchor.page) }) { Text("В конспект") }
+                        TextButton(onClick = { vm.focusPane(session.pane); addConsp = s }) { Text("Добавить в конспект…") }
                         TextButton(onClick = { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text)) }) { Text(stringResource(R.string.copy)) }
                         IconButton(onClick = { s.view.clearSelection(); selection = null }) { Icon(Outline.Close, stringResource(R.string.clear_selection)) }
                         ColorPalette(null) { color -> vm.highlight(s.text, s.anchor, color, session.document); s.view.clearSelection(); selection = null }
@@ -153,28 +151,34 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         Column(Modifier.fillMaxSize()) {
             var help by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                WorkspaceAction(Outline.Note, "Цитаты в PDF", { showPanel = !showPanel || bookmarksTab; bookmarksTab = false }, Modifier.testTag("reader-quotes-button"), selected = showPanel && !bookmarksTab)
-                WorkspaceAction(Outline.Bookmark, "Закладки", { showPanel = !showPanel || !bookmarksTab; bookmarksTab = true }, Modifier.testTag("reader-bookmarks-button"), selected = showPanel && bookmarksTab)
+                WorkspaceAction(Outline.Note, "Цитаты в PDF", { showPanel = !showPanel || bookmarksTab || conspTab; bookmarksTab = false; conspTab = false }, Modifier.testTag("reader-quotes-button"), selected = showPanel && !bookmarksTab && !conspTab)
+                WorkspaceAction(Outline.Bookmark, "Закладки", { showPanel = !showPanel || !bookmarksTab || conspTab; bookmarksTab = true; conspTab = false }, Modifier.testTag("reader-bookmarks-button"), selected = showPanel && bookmarksTab && !conspTab)
                 WorkspaceAction(Outline.Plus, "Добавить закладку", { bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = session.offset) })
-                WorkspaceAction(Outline.Edit, "Создать конспект", { vm.focusPane(session.pane); vm.newNote(session.document.id) })
+                WorkspaceAction(Outline.Edit, "Конспекты книги", { showPanel = !showPanel || !conspTab; conspTab = true }, Modifier.testTag("reader-consp-button"), selected = showPanel && conspTab)
+                WorkspaceAction(Outline.Plus, "Создать конспект", { vm.focusPane(session.pane); createConsp = true }, Modifier.testTag("reader-create-consp"))
                 WorkspaceAction(Outline.Search, "Поиск в PDF", { search = true })
                 WorkspaceAction(Outline.Settings, "Свойства PDF", { properties = true })
                 TextButton(onClick = { quickPages = !quickPages }, modifier = Modifier.heightIn(min = 48.dp).testTag("reader-page-counter")) { Text(stringResource(R.string.page, currentPage + 1, session.engine.pageCount)) }
                 TextButton(onClick = { fitPage = !fitPage; go(currentPage) }) { Text(stringResource(if (fitPage) R.string.fit_width else R.string.fit_page)) }
                 WorkspaceAction(Outline.Split, "Открыть справа", { vm.openRight(WorkspaceTab(session.tabId, session.document.id, WorkspaceKind.Pdf, page = currentPage, offset = session.offset), session.pane) })
+                WorkspaceAction(Outline.Fullscreen, if (fullscreen) "Выйти из полного экрана" else "Полный экран", { onFullscreen(!fullscreen) })
                 var menu by remember { mutableStateOf(false) }
                 Box {
                     WorkspaceAction(Outline.More, "Действия PDF", { menu = true })
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem(text = { Text("Справка по чтению") }, onClick = { menu = false; help = true })
-                        DropdownMenuItem(text = { Text(if (fullscreen) "Выйти из полного экрана" else "Полный экран") }, onClick = { menu = false; onFullscreen(!fullscreen) })
+
                     }
                 }
             }
             HorizontalDivider()
-            if (help) AlertDialog(onDismissRequest = { help = false }, title = { Text("Чтение PDF") }, text = { Text(stringResource(R.string.reader_hint) + "\n\nКоснитесь счётчика страниц для быстрого перехода. Удерживайте слово для выделения; ручки меняют границы. Стрелки и Page Up/Down работают в активной области PDF.") }, confirmButton = { TextButton(onClick = { help = false }) { Text("Понятно") } })
+            if (help) HelpDialog { help = false }
+            if (createConsp) CreateConspDialog(data, session.document.id, null, vm) { createConsp = false }
+            addConsp?.let { selected -> ConspQuoteDialog(selected.text, session.document, selected.anchor.page, data, vm) { addConsp = null } }
             Row(Modifier.weight(1f)) {
-                if (!wide && showPanel) {
+                if (!wide && showPanel && conspTab) {
+                    BookConspPanel(session.document, data, vm, session.pane, { showPanel = false }, Modifier.fillMaxSize())
+                } else if (!wide && showPanel) {
                     ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
                         { vm.editBeside(it, session.pane) }, { vm.source(it); showPanel = false }, { vm.openBookmark(it); showPanel = false }, { showPanel = false }, Modifier.fillMaxSize())
                 } else {
@@ -190,7 +194,8 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                     }
                     if (wide && showPanel) {
                         ResizeHandle("resize-structure", { vm.layout(structureWidth = vm.workspace.value.structureWidth - it) })
-                        ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
+                        if (conspTab) BookConspPanel(session.document, data, vm, session.pane, { showPanel = false }, Modifier.width(workspace.structureWidth.dp).fillMaxHeight())
+                        else ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
                             { vm.editEntry(it, 1 - session.pane); vm.layout(split = true) }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(workspace.structureWidth.dp).fillMaxHeight())
                     }
                 }

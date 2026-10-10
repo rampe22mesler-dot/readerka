@@ -1,0 +1,308 @@
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ConspWorkflowTest:
+INSTRUMENTATION_STATUS: test=mouseEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=mouseEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=repeatedQuotesReuseOneConspAndSourcesCanBeDetached
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=repeatedQuotesReuseOneConspAndSourcesCanBeDetached
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=keyboardEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=keyboardEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=fullscreenLastTabCloseCollapsesAndTouchBoundaryCanHidePane
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fullscreenLastTabCloseCollapsesAndTouchBoundaryCanHidePane
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=touchOnlyEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=touchOnlyEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=narrowSplitKeepsNativeCaretAndSaveAboveRealIme
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stack=androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 60000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at org.readerka.ConspWorkflowTest.narrowSplitKeepsNativeCaretAndSaveAboveRealIme$lambda$89(ConspWorkflowTest.kt:182)
+	at org.readerka.ConspWorkflowTest.$r8$lambda$ft-SL-js4ivkmC-JFM2QIs_9Gg8(Unknown Source:0)
+	at org.readerka.ConspWorkflowTest$$ExternalSyntheticLambda42.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ConspWorkflowTest.fixture(ConspWorkflowTest.kt:64)
+	at org.readerka.ConspWorkflowTest.narrowSplitKeepsNativeCaretAndSaveAboveRealIme(ConspWorkflowTest.kt:155)
+
+INSTRUMENTATION_STATUS: stream=
+Error in narrowSplitKeepsNativeCaretAndSaveAboveRealIme(org.readerka.ConspWorkflowTest):
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 60000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at org.readerka.ConspWorkflowTest.narrowSplitKeepsNativeCaretAndSaveAboveRealIme$lambda$89(ConspWorkflowTest.kt:182)
+	at org.readerka.ConspWorkflowTest.$r8$lambda$ft-SL-js4ivkmC-JFM2QIs_9Gg8(Unknown Source:0)
+	at org.readerka.ConspWorkflowTest$$ExternalSyntheticLambda42.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ConspWorkflowTest.fixture(ConspWorkflowTest.kt:64)
+	at org.readerka.ConspWorkflowTest.narrowSplitKeepsNativeCaretAndSaveAboveRealIme(ConspWorkflowTest.kt:155)
+
+INSTRUMENTATION_STATUS: test=narrowSplitKeepsNativeCaretAndSaveAboveRealIme
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderMigrationTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ReaderMigrationTest:
+INSTRUMENTATION_STATUS: test=upgradeOriginalDatabaseWithoutLosingQuotesFoldersTagsOrBookmarks
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderMigrationTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=upgradeOriginalDatabaseWithoutLosingQuotesFoldersTagsOrBookmarks
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderMigrationTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=upgradePreviewDatabase2KeepsNotesAndConvertsOnlyExplicitly
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderMigrationTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=upgradePreviewDatabase2KeepsNotesAndConvertsOnlyExplicitly
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+org.readerka.WorkspaceRecoveryTest:
+INSTRUMENTATION_STATUS: test=durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.PdfWorkflowTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+org.readerka.PdfWorkflowTest:
+INSTRUMENTATION_STATUS: test=pannedPageRemainsVisibleAfterViewportShrinks
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.PdfWorkflowTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=pannedPageRemainsVisibleAfterViewportShrinks
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.PdfWorkflowTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=fingerSelectionPersistsAcrossDatabaseAndPdfReopenAndZoom
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.PdfWorkflowTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fingerSelectionPersistsAcrossDatabaseAndPdfReopenAndZoom
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.PdfWorkflowTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=realTextMultilineGeometryAndRotation
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.PdfWorkflowTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=realTextMultilineGeometryAndRotation
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.LibraryIntegrationTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+org.readerka.LibraryIntegrationTest:
+INSTRUMENTATION_STATUS: test=importCanonicalMembershipBackupRestoreAndConflictProtection
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.LibraryIntegrationTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=importCanonicalMembershipBackupRestoreAndConflictProtection
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ReaderControlsTest:
+INSTRUMENTATION_STATUS: test=keyboardAndCenterTapSliderNavigateAndScrolledPagesKeepTheirImages
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=keyboardAndCenterTapSliderNavigateAndScrolledPagesKeepTheirImages
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=15
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=documentFoldersAndNestedBookmarksAreAvailableDuringReading
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=15
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Action performScrollTo() failed.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'entry-reader-folders')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performScrollTo(Actions.kt:76)
+	at org.readerka.ReaderControlsTest.documentFoldersAndNestedBookmarksAreAvailableDuringReading$lambda$46(ReaderControlsTest.kt:215)
+	at org.readerka.ReaderControlsTest.$r8$lambda$9HRHyyUxAiJVOZN4rLzeyl2RuAY(Unknown Source:0)
+	at org.readerka.ReaderControlsTest$$ExternalSyntheticLambda13.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ReaderControlsTest.withDocument(ReaderControlsTest.kt:82)
+	at org.readerka.ReaderControlsTest.documentFoldersAndNestedBookmarksAreAvailableDuringReading(ReaderControlsTest.kt:195)
+
+INSTRUMENTATION_STATUS: stream=
+Error in documentFoldersAndNestedBookmarksAreAvailableDuringReading(org.readerka.ReaderControlsTest):
+java.lang.AssertionError: Action performScrollTo() failed.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'entry-reader-folders')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performScrollTo(Actions.kt:76)
+	at org.readerka.ReaderControlsTest.documentFoldersAndNestedBookmarksAreAvailableDuringReading$lambda$46(ReaderControlsTest.kt:215)
+	at org.readerka.ReaderControlsTest.$r8$lambda$9HRHyyUxAiJVOZN4rLzeyl2RuAY(Unknown Source:0)
+	at org.readerka.ReaderControlsTest$$ExternalSyntheticLambda13.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ReaderControlsTest.withDocument(ReaderControlsTest.kt:82)
+	at org.readerka.ReaderControlsTest.documentFoldersAndNestedBookmarksAreAvailableDuringReading(ReaderControlsTest.kt:195)
+
+INSTRUMENTATION_STATUS: test=documentFoldersAndNestedBookmarksAreAvailableDuringReading
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=16
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=tapSavedHighlightDeleteItAndTranslateRealSelection
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=16
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=16
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=tapSavedHighlightDeleteItAndTranslateRealSelection
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 448.448
+There were 2 failures:
+1) narrowSplitKeepsNativeCaretAndSaveAboveRealIme(org.readerka.ConspWorkflowTest)
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 60000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at org.readerka.ConspWorkflowTest.narrowSplitKeepsNativeCaretAndSaveAboveRealIme$lambda$89(ConspWorkflowTest.kt:182)
+	at org.readerka.ConspWorkflowTest.$r8$lambda$ft-SL-js4ivkmC-JFM2QIs_9Gg8(Unknown Source:0)
+	at org.readerka.ConspWorkflowTest$$ExternalSyntheticLambda42.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ConspWorkflowTest.fixture(ConspWorkflowTest.kt:64)
+	at org.readerka.ConspWorkflowTest.narrowSplitKeepsNativeCaretAndSaveAboveRealIme(ConspWorkflowTest.kt:155)
+2) documentFoldersAndNestedBookmarksAreAvailableDuringReading(org.readerka.ReaderControlsTest)
+java.lang.AssertionError: Action performScrollTo() failed.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'entry-reader-folders')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performScrollTo(Actions.kt:76)
+	at org.readerka.ReaderControlsTest.documentFoldersAndNestedBookmarksAreAvailableDuringReading$lambda$46(ReaderControlsTest.kt:215)
+	at org.readerka.ReaderControlsTest.$r8$lambda$9HRHyyUxAiJVOZN4rLzeyl2RuAY(Unknown Source:0)
+	at org.readerka.ReaderControlsTest$$ExternalSyntheticLambda13.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ReaderControlsTest.withDocument(ReaderControlsTest.kt:82)
+	at org.readerka.ReaderControlsTest.documentFoldersAndNestedBookmarksAreAvailableDuringReading(ReaderControlsTest.kt:195)
+
+FAILURES!!!
+Tests run: 16,  Failures: 2
+
+
+INSTRUMENTATION_CODE: -1

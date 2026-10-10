@@ -23,7 +23,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
-@Composable fun NotesScreen(data: LibrarySnapshot, vm: LibraryViewModel, folder: String?, onFolder: (String?) -> Unit, onShowFolders: () -> Unit, onExport: (ExportKind, Set<String>?) -> Unit) {
+@Composable fun NotesScreen(data: LibrarySnapshot, vm: LibraryViewModel, folder: String?, onFolder: (String?) -> Unit, onShowFolders: () -> Unit, onExport: (ExportKind, Set<String>?) -> Unit, consp: Boolean = false) {
+    var createConsp by remember { mutableStateOf(false) }
     var compactRows by rememberSaveable { mutableStateOf(true) }
     var search by rememberSaveable { mutableStateOf("") }
     var filterDialog by remember { mutableStateOf(false) }
@@ -44,7 +45,7 @@ import java.util.UUID
     var batchTags by remember { mutableStateOf("") }
     val folders = data.collections.map { FolderItem(it.id, it.name, it.parentId) }
     val dateMillis = remember(date) { runCatching { LocalDate.parse(date).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() }.getOrNull() }
-    val entries = remember(data, search, folder, source, type, color, tag, dateMillis, sort) { NoteQuery(search, folder, source, type, color, tag, dateMillis, sort).apply(data) }
+    val entries = remember(data, search, folder, source, type, color, tag, dateMillis, sort, consp) { NoteQuery(search, folder, source, type, color, tag, dateMillis, sort).apply(data).filter { (it.kind == EntryKind.Consp) == consp } }
     LaunchedEffect(data) {
         selectedList = selectedList.filter { id -> data.entries.any { it.id == id } }
         if (source != null && data.documents.none { it.id == source }) source = null
@@ -55,8 +56,8 @@ import java.util.UUID
         Column(Modifier.weight(1f).padding(if (LocalCompact.current) 12.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onShowFolders) { Icon(Outline.Menu, stringResource(R.string.collections)) }
-                Text(folders.firstOrNull { it.id == folder }?.name ?: stringResource(R.string.all_notes), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = { vm.newNote(collection = folder) }) { Icon(Outline.Plus, null); Text(stringResource(R.string.create_note)) }
+                Text(folders.firstOrNull { it.id == folder }?.name ?: if (consp) "Конспекты" else stringResource(R.string.all_notes), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = { if (consp) createConsp = true else vm.newNote(collection = folder) }) { Icon(Outline.Plus, null); Text(if (consp) "Создать конспект" else stringResource(R.string.create_note)) }
             }
             OutlinedTextField(search, { search = it }, label = { Text(stringResource(R.string.search_notes)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -95,6 +96,7 @@ import java.util.UUID
             }
         }
     }
+    if (createConsp) CreateConspDialog(data, null, folder, vm) { createConsp = false }
     if (folderEditor) FolderEditor(editedFolder, folders, createParent, { folderEditor = false }, { vm.collection(org.readerka.data.Collection(it.id, it.name, it.parentId)) }, { vm.deleteFolder(it, true) })
 
     if (delete) Confirm(R.string.delete_entries_title, R.string.delete_entries_body, { delete = false }, { vm.deleteEntries(selected); selectedList = emptyList(); delete = false })

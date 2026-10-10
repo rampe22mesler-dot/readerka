@@ -7,6 +7,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import androidx.room.withTransaction
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Test
@@ -17,6 +21,32 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class WorkspaceRecoveryTest {
+    @Test fun typingWhileManualSaveWaitsForDatabaseRetainsTheNewerDraft() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
+        val disk = WorkspaceStore(app); val previous = disk.values.first()
+        val id = UUID.randomUUID().toString(); val models = ViewModelStore()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        lateinit var vm: LibraryViewModel
+        val started = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        try {
+            disk.save(WorkspaceState())
+            instrumentation.runOnMainSync { vm = LibraryViewModel(app, SavedStateHandle()); models.put("save-race", vm); vm.editEntry(Entry(id, "Race", comment = "Before save")) }
+            val draft = withTimeout(30_000) { vm.workspace.first { it.editor?.entry?.id == id }.editor!! }
+            val holding = async(Dispatchers.IO) { app.database.withTransaction { started.complete(Unit); release.await() } }
+            started.await()
+            lateinit var saving: kotlinx.coroutines.Job
+            instrumentation.runOnMainSync { saving = vm.saveEditor(id) }
+            withTimeout(30_000) { vm.editorSaving.first { it } }
+            val newer = draft.copy(entry = draft.entry.withContent(RichText.plain("Typed during save")))
+            instrumentation.runOnMainSync { vm.updateDraft(newer) }
+            release.complete(Unit); holding.await(); saving.join()
+            assertEquals("Typed during save", vm.workspace.value.drafts.single { it.entry.id == id }.entry.content!!.text)
+            assertEquals("Typed during save", disk.values.first().drafts.single { it.entry.id == id }.entry.content!!.text)
+            instrumentation.runOnMainSync { saving = vm.saveEditor(id) }; saving.join()
+            assertEquals("Typed during save", app.database.dao().allEntries().single { it.id == id }.content!!.text)
+            assertTrue(vm.workspace.value.drafts.none { it.entry.id == id })
+        } finally { release.complete(Unit); instrumentation.runOnMainSync { models.clear() }; disk.save(previous); app.database.dao().deleteEntries(listOf(id)) }
+    }
     @Test fun durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
         val dao = app.database.dao()

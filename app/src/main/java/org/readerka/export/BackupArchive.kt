@@ -9,7 +9,7 @@ import java.security.MessageDigest
 import java.util.zip.*
 
 @Serializable
-data class BackupManifest(val version: Int = 2, val sha256: Map<String, String>)
+data class BackupManifest(val version: Int = 3, val sha256: Map<String, String>)
 data class StagedBackup(val data: LibrarySnapshot, val directory: File)
 
 object BackupArchive {
@@ -54,7 +54,7 @@ object BackupArchive {
                 }
             }
             val manifest = json.decodeFromString<BackupManifest>(File(directory, "manifest.json").readText())
-            require(manifest.version in 1..2) { "Unsupported backup version" }
+            require(manifest.version in 1..3) { "Unsupported backup version" }
             require(seen == manifest.sha256.keys + "manifest.json") { "Incomplete backup" }
             for ((name, hash) in manifest.sha256) require(digest(File(directory, name)) == hash) { "Checksum mismatch" }
             val data = json.decodeFromString<LibrarySnapshot>(File(directory, "library.json").readText())
@@ -64,7 +64,7 @@ object BackupArchive {
         } catch (e: Exception) { directory.deleteRecursively(); throw e }
     }
     fun validate(s: LibrarySnapshot) {
-        require(s.version in 1..2)
+        require(s.version in 1..3)
         fun ids(values: List<String>): Set<String> { require(values.all { it.isNotBlank() } && values.distinct().size == values.size); return values.toSet() }
         val docIds = ids(s.documents.map { it.id }); val entryIds = ids(s.entries.map { it.id })
         val collectionIds = ids(s.collections.map { it.id }); val folderIds = ids(s.documentFolders.map { it.id }); val tagIds = ids(s.tags.map { it.id })
@@ -82,6 +82,21 @@ object BackupArchive {
                 require(a.page >= 0 && a.page < doc.pageCount && a.start >= 0 && a.end > a.start && a.rects.isNotEmpty())
                 for (r in a.rects) require(r.left.isFinite() && r.top.isFinite() && r.right.isFinite() && r.bottom.isFinite() && r.left in 0f..1f && r.top in 0f..1f && r.right in r.left..1f && r.bottom in r.top..1f)
             }
+        }
+        ids(s.noteVersions.map { it.id })
+        s.entries.forEach { e ->
+            require(e.sources.distinct().size == e.sources.size && e.sources.all { it in docIds })
+            e.content?.let { c ->
+                require(c.marks.all { it.start >= 0 && it.end <= c.text.length && it.start < it.end })
+                require(c.blocks.map { it.id }.distinct().size == c.blocks.size && c.blocks.firstOrNull()?.start == 0)
+                require(c.blocks.map { it.start } == (listOf(0) + c.text.indices.filter { c.text[it] == '\n' }.map { it + 1 }))
+                require(c.markdown() == e.comment)
+            }
+        }
+        s.noteVersions.forEach { v ->
+            require(v.entryId in entryIds)
+            val draft = json.decodeFromString<EntryDraft>(v.snapshot)
+            require(draft.entry.id == v.entryId)
         }
         s.memberships.forEach { require(it.entryId in entryIds && it.collectionId in collectionIds) }
         s.entryTags.forEach { require(it.entryId in entryIds && it.tagId in tagIds) }

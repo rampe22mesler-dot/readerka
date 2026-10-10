@@ -49,6 +49,8 @@ object Outline {
     val Left = glyph("Назад", "M15,5 L8,12 L15,19")
     val Right = glyph("Вперёд", "M9,5 L16,12 L9,19")
     val Down = glyph("Развернуть", "M5,9 L12,16 L19,9")
+    val Fullscreen = glyph("Полный экран", "M3,9 V3 H9 M15,3 H21 V9 M21,15 V21 H15 M9,21 H3 V15")
+    val Help = glyph("Справка", "M21,12 A9,9 0,1 1,3 12 A9,9 0,1 1,21 12 M9,8 Q9,5 12,6 Q16,8 12,11 V14 M12,18 V18.1")
     val Split = glyph("Две области", "M3,4 H21 V20 H3 Z M12,4 V20")
     val Pin = glyph("Закрепить", "M8,3 H16 L15,9 L18,13 H6 L9,9 Z M12,13 V21")
     val Edit = glyph("Редактировать", "M4,16 L16,4 L20,8 L8,20 H4 Z M13,7 L17,11")
@@ -76,14 +78,17 @@ object Outline {
 }
 
 /** Finger-sized handle with a thin visual rule; presets are also available in Layout. */
-@Composable fun ResizeHandle(label: String, onDrag: (Float) -> Unit, modifier: Modifier = Modifier, vertical: Boolean = true) {
+@Composable fun ResizeHandle(label: String, onDrag: (Float) -> Unit, modifier: Modifier = Modifier, vertical: Boolean = true, onStart: () -> Unit = {}, onEnd: () -> Unit = {}, onCancel: () -> Unit = {}) {
     val density = LocalDensity.current
     val callback by rememberUpdatedState(onDrag)
+    val startCallback by rememberUpdatedState(onStart)
+    val endCallback by rememberUpdatedState(onEnd)
+    val cancelCallback by rememberUpdatedState(onCancel)
     val origin = remember { mutableStateOf(Offset.Zero) }
     Box(modifier.then(if (vertical) Modifier.width(48.dp).fillMaxHeight() else Modifier.height(48.dp).fillMaxWidth())
         .testTag(label).onGloballyPositioned { origin.value = it.boundsInRoot().topLeft }.pointerInput(vertical) {
             var previous: Offset? = null
-            detectDragGestures(onDragStart = { previous = null }, onDragEnd = { previous = null }, onDragCancel = { previous = null }) { change, amount ->
+            detectDragGestures(onDragStart = { previous = null; startCallback() }, onDragEnd = { previous = null; endCallback() }, onDragCancel = { previous = null; cancelCallback() }) { change, amount ->
                 val position = origin.value + change.position
                 val movement = previous?.let { position - it } ?: amount
                 previous = position

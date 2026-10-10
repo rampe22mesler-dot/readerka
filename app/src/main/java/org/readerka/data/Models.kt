@@ -46,7 +46,9 @@ data class Document(
 data class Entry(
     @PrimaryKey val id: String, val title: String, val quote: String = "", val comment: String = "",
     val documentId: String? = null, val anchor: Anchor? = null, val type: NoteType = NoteType.GeneralNote,
-    val color: Marker = Marker.Yellow, @EncodeDefault val createdAt: Long = System.currentTimeMillis(), @EncodeDefault val updatedAt: Long = createdAt
+    val color: Marker = Marker.Yellow, @EncodeDefault val createdAt: Long = System.currentTimeMillis(), @EncodeDefault val updatedAt: Long = createdAt,
+    @ColumnInfo(defaultValue = "'Note'") val kind: EntryKind = if (type == NoteType.Quote || anchor != null) EntryKind.Quote else EntryKind.Note,
+    @ColumnInfo(defaultValue = "'[]'") val sources: List<String> = emptyList(), val content: RichText? = null
 )
 
 @Serializable
@@ -104,15 +106,26 @@ data class ReaderFolder(@PrimaryKey val id: String, val documentId: String, val 
 data class ReaderMembership(val folderId: String, val entryId: String)
 
 @Serializable
+@Entity(tableName = "note_versions", foreignKeys = [ForeignKey(entity = Entry::class, parentColumns = ["id"], childColumns = ["entryId"], onDelete = ForeignKey.CASCADE)], indices = [Index("entryId")])
+data class NoteVersion(@PrimaryKey val id: String, val entryId: String, val snapshot: String, val createdAt: Long, val label: String)
+
+@Serializable
 data class LibrarySnapshot(
-    val version: Int = 2, val documents: List<Document> = emptyList(), val documentFolders: List<DocumentFolder> = emptyList(),
+    val version: Int = 3, val documents: List<Document> = emptyList(), val documentFolders: List<DocumentFolder> = emptyList(),
     val entries: List<Entry> = emptyList(), val collections: List<Collection> = emptyList(),
     val memberships: List<Membership> = emptyList(), val tags: List<Tag> = emptyList(),
     val entryTags: List<EntryTag> = emptyList(), val documentTags: List<DocumentTag> = emptyList(), val bookmarks: List<Bookmark> = emptyList(),
-    val readerFolders: List<ReaderFolder> = emptyList(), val readerMemberships: List<ReaderMembership> = emptyList()
+    val readerFolders: List<ReaderFolder> = emptyList(), val readerMemberships: List<ReaderMembership> = emptyList(),
+    val noteVersions: List<NoteVersion> = emptyList()
 )
 
 class Converters {
+    @TypeConverter fun kindToString(value: EntryKind) = value.name
+    @TypeConverter fun stringToKind(value: String) = EntryKind.valueOf(value)
+    @TypeConverter fun sourcesToJson(value: List<String>): String = Json.encodeToString(value)
+    @TypeConverter fun jsonToSources(value: String): List<String> = Json.decodeFromString(value)
+    @TypeConverter fun contentToJson(value: RichText?): String? = value?.let { Json.encodeToString(it) }
+    @TypeConverter fun jsonToContent(value: String?): RichText? = value?.let { Json.decodeFromString(it) }
     @TypeConverter fun anchorToJson(value: Anchor?): String? = value?.let { Json.encodeToString(it) }
     @TypeConverter fun jsonToAnchor(value: String?): Anchor? = value?.let { Json.decodeFromString(it) }
     @TypeConverter fun typeToString(value: NoteType) = value.name

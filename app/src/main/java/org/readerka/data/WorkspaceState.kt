@@ -17,7 +17,8 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class EntryDraft(val entry: Entry, val tags: String = "", val collections: Set<String> = emptySet(),
-    val readerFolders: Set<String> = emptySet(), @EncodeDefault val modifiedAt: Long = System.currentTimeMillis())
+    val readerFolders: Set<String> = emptySet(), @EncodeDefault val modifiedAt: Long = System.currentTimeMillis(),
+    val cursorStart: Int = 0, val cursorEnd: Int = 0, val focusedField: String = "")
 
 @Serializable
 data class ReadingLocation(val documentId: String, val page: Int, val offset: Int = 0)
@@ -66,7 +67,8 @@ data class WorkspacePane(val tabs: List<WorkspaceTab> = emptyList(), val selecte
 data class WorkspaceState(val drafts: List<EntryDraft> = emptyList(), val activeDraftId: String? = null,
     val history: ReadingHistory = ReadingHistory(), val panes: List<WorkspacePane> = listOf(WorkspacePane(), WorkspacePane()),
     val activePane: Int = 0, val split: Boolean = false, val splitFraction: Float = .5f,
-    val sidebarWidth: Float = 260f, val structureWidth: Float = 280f, val sidebarVisible: Boolean = true) {
+    val sidebarWidth: Float = 260f, val structureWidth: Float = 280f, val sidebarVisible: Boolean = true,
+    val visiblePane: Int = 0, val lastConspByBook: Map<String, String> = emptyMap()) {
     val editor get() = drafts.firstOrNull { it.entry.id == activeDraftId }
 }
 

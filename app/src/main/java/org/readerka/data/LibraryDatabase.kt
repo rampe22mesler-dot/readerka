@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class LibraryDao {
+    @Query("SELECT * FROM note_versions ORDER BY createdAt DESC") abstract suspend fun allNoteVersions(): List<NoteVersion>
+    @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun putNoteVersion(value: NoteVersion)
+    @Query("DELETE FROM note_versions WHERE entryId = :id AND id NOT IN (SELECT id FROM note_versions WHERE entryId = :id ORDER BY createdAt DESC LIMIT 30)") abstract suspend fun pruneVersions(id: String)
     @Query("SELECT * FROM documents ORDER BY lastOpenedAt DESC, createdAt DESC") abstract fun documents(): Flow<List<Document>>
     @Query("SELECT * FROM entries ORDER BY updatedAt DESC") abstract fun entries(): Flow<List<Entry>>
     @Query("SELECT * FROM document_folders ORDER BY name") abstract fun documentFolders(): Flow<List<DocumentFolder>>
@@ -57,11 +60,11 @@ abstract class LibraryDao {
         documents = allDocuments(), documentFolders = allDocumentFolders(), entries = allEntries(),
         collections = allCollections(), memberships = allMemberships(), tags = allTags(),
         entryTags = allEntryTags(), documentTags = allDocumentTags(), bookmarks = allBookmarks(),
-        readerFolders = allReaderFolders(), readerMemberships = allReaderMemberships()
+        readerFolders = allReaderFolders(), readerMemberships = allReaderMemberships(), noteVersions = allNoteVersions()
     )
 }
 
-@Database(entities = [Document::class, DocumentFolder::class, Entry::class, Collection::class, Membership::class, Tag::class, EntryTag::class, DocumentTag::class, Bookmark::class, ReaderFolder::class, ReaderMembership::class], version = 2, exportSchema = true)
+@Database(entities = [Document::class, DocumentFolder::class, Entry::class, Collection::class, Membership::class, Tag::class, EntryTag::class, DocumentTag::class, Bookmark::class, ReaderFolder::class, ReaderMembership::class, NoteVersion::class], version = 3, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
@@ -82,6 +85,16 @@ abstract class LibraryDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX index_bookmarks_folderId ON bookmarks(folderId)")
             }
         }
-        fun open(context: Context, name: String = "readerka.db") = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'Note'")
+                db.execSQL("UPDATE entries SET kind = 'Quote' WHERE type = 'Quote' OR anchor IS NOT NULL")
+                db.execSQL("ALTER TABLE entries ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE entries ADD COLUMN content TEXT")
+                db.execSQL("CREATE TABLE IF NOT EXISTS note_versions (id TEXT NOT NULL PRIMARY KEY, entryId TEXT NOT NULL, snapshot TEXT NOT NULL, createdAt INTEGER NOT NULL, label TEXT NOT NULL, FOREIGN KEY(entryId) REFERENCES entries(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_versions_entryId ON note_versions(entryId)")
+            }
+        }
+        fun open(context: Context, name: String = "readerka.db") = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     }
 }

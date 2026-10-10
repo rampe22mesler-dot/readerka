@@ -42,7 +42,7 @@ class VaultExporter {
         val collections = data.collections.associate { it.id to (it.name to it.parentId) }
         val collectionPaths = data.collections.associate { it.id to "Коллекции/${folderPath(it.id, collections)}" }
         val sourcePaths = data.documents.associate { it.id to "Источники/${stableName(it.title, it.id)}.md" }
-        val notePaths = data.entries.associate { it.id to "Заметки/${if (it.anchor != null) "Цитаты" else "Самостоятельные"}/${stableName(it.title, it.id)}.md" }
+        val notePaths = data.entries.associate { it.id to if (it.kind == EntryKind.Consp) "Конспекты/${stableName(it.title, it.id)}.md" else "Заметки/${if (it.anchor != null) "Цитаты" else "Самостоятельные"}/${stableName(it.title, it.id)}.md" }
         val desiredPdfPaths = data.documents.associate { d ->
             val base = "Библиотека/" + folderPath(d.folderId, folders).let { if (it.isEmpty()) "" else "$it/" }
             d.id to base + safeName(d.originalName).let { if (it.endsWith(".pdf", true)) it else "$it.pdf" }
@@ -77,7 +77,7 @@ class VaultExporter {
             fun directory(path: String) {
                 if (written.add("$path/")) { zip.putNextEntry(ZipEntry("$root$path/")); zip.closeEntry() }
             }
-            for (path in listOf("Библиотека", "Источники", "Заметки/Цитаты", "Заметки/Самостоятельные", "Коллекции", "Закладки")) directory(path)
+            for (path in listOf("Библиотека", "Источники", "Заметки/Цитаты", "Заметки/Самостоятельные", "Конспекты", "Коллекции", "Закладки")) directory(path)
             for (f in data.documentFolders) directory("Библиотека/${folderPath(f.id, folders)}")
             for (d in data.documents) {
                 if (includePdf) {
@@ -105,11 +105,18 @@ class VaultExporter {
                 text(sourcePaths.getValue(d.id), content)
             }
             for (e in data.entries) {
+                val currentPath = notePaths.getValue(e.id)
+                val prefix = "../".repeat(currentPath.count { it == '/' })
+                fun encoded(path: String) = path.split('/').joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
+                val rendered = rewriteResearchLinks(if (e.content != null) e.comment else md(e.comment),
+                    { id, block -> notePaths[id]?.let { encoded(prefix + it) + (block?.let { b -> "#$b" } ?: "") } },
+                    { id, page -> pdfPaths[id]?.takeIf { id in available }?.let { encoded(prefix + it) + "#page=$page" } })
                 val d = docs[e.documentId]
                 val memberPaths = data.memberships.filter { it.entryId == e.id }.map { collectionPaths.getValue(it.collectionId).removePrefix("Коллекции/") }
                 val entryTags = data.entryTags.filter { it.entryId == e.id }.mapNotNull { tags[it.tagId]?.name }
                 text(notePaths.getValue(e.id), buildString {
                     append("---\nid: ${yaml(e.id)}\ntype: ${yaml(if (e.type == NoteType.GeneralNote) "General Note" else e.type.name)}\ncolor: ${yaml(e.color.name.lowercase())}\n")
+                    append("kind: ${yaml(e.kind.name)}\nsource_ids: ${Json.encodeToString(e.sources)}\n")
                     append("tags: ${Json.encodeToString(entryTags)}\ncollections: ${Json.encodeToString(memberPaths)}\n")
                     val internalPaths = data.readerMemberships.filter { it.entryId == e.id }.map { readerPaths.getValue(it.folderId) }
                     append("reader_folders: ${Json.encodeToString(internalPaths)}\n")
@@ -120,8 +127,12 @@ class VaultExporter {
                         if (d.id in available) append("source_pdf_path: ${yaml(pdfPaths.getValue(d.id))}\n")
                     }
                     append("---\n# ${heading(e.title)}\n\n")
-                    if (e.anchor != null) append("## Цитата\n${quote(e.quote)}\n\n## Мой комментарий\n${md(e.comment)}\n")
-                    else append(md(e.comment) + "\n")
+                    if (e.anchor != null) append("## Цитата\n${quote(e.quote)}\n\n## Мой комментарий\n${rendered}\n")
+                    else append(rendered + "\n")
+                    if (e.kind == EntryKind.Consp && e.sources.isNotEmpty()) {
+                        append("\n## Связанные книги\n")
+                        e.sources.mapNotNull { docs[it] }.forEach { source -> append("- ${wiki(sourcePaths.getValue(source.id))}\n") }
+                    }
                     if (d != null) {
                         append("\n## Источник\n- PDF-файл: `${d.originalName.replace('`', '\'')}`\n")
                         e.anchor?.let { append("- Страница PDF: **${it.page + 1}**\n") }
@@ -155,7 +166,7 @@ class VaultExporter {
                 text("$path/_Папка.md", "# ${heading(f.name)}\n\n" + (links + children).joinToString("\n") { "- ${wiki(it)}" } + "\n")
             }
             text("_Содержание.md", buildString {
-                append("# Readerka Vault\n\nОдносторонний снимок библиотеки. Основной текст каждой записи находится только в «Заметки». В папках коллекций — ссылки и встраивания этих записей. Изменения в Vault не возвращаются в Readerka.\n\n## Источники\n")
+                append("# Readerka Vault\n\nОдносторонний снимок библиотеки. Основной текст каждой записи находится в «Заметки» или «Конспекты». В папках коллекций — ссылки и встраивания этих записей. Изменения в Vault не возвращаются в Readerka.\n\n## Источники\n")
                 for (d in data.documents) append("- ${wiki(sourcePaths.getValue(d.id))}\n")
                 append("\n## Коллекции\n")
                 for (c in data.collections) append("- ${wiki(collectionPaths.getValue(c.id) + "/_Коллекция.md")}\n")

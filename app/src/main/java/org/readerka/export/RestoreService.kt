@@ -20,7 +20,7 @@ class RestoreService(private val repository: LibraryRepository) {
                 checkConflicts(current.documents, s.documents) { it.id }; checkConflicts(current.entries, s.entries) { it.id }
                 checkConflicts(current.documentFolders, s.documentFolders) { it.id }; checkConflicts(current.collections, s.collections) { it.id }
                 checkConflicts(current.tags, s.tags) { it.id }; checkConflicts(current.bookmarks, s.bookmarks) { it.id }
-                checkConflicts(current.readerFolders, s.readerFolders) { it.id }
+                checkConflicts(current.readerFolders, s.readerFolders) { it.id }; checkConflicts(current.noteVersions, s.noteVersions) { it.id }
                 require(s.tags.none { t -> current.tags.any { it.name == t.name && it.id != t.id } }) { "Conflicting tag identity" }
                 fun hash(file: File): ByteArray = file.inputStream().use { input ->
                     val md = MessageDigest.getInstance("SHA-256"); val buffer = ByteArray(65536)
@@ -42,6 +42,7 @@ class RestoreService(private val repository: LibraryRepository) {
                 s.documents.forEach { dao.putDocument(it) }
                 FolderTree.ordered(s.readerFolders, { it.id }, { it.parentId }).forEach { dao.putReaderFolder(it) }
                 s.entries.forEach { dao.putEntry(it) }
+                s.noteVersions.forEach { dao.putNoteVersion(it) }
                 s.tags.forEach { dao.putTag(it) }; s.memberships.forEach { dao.putMembership(it) }
                 s.entryTags.forEach { dao.putEntryTag(it) }; s.documentTags.forEach { dao.putDocumentTag(it) }
                 s.readerMemberships.forEach { dao.putReaderMembership(it) }
