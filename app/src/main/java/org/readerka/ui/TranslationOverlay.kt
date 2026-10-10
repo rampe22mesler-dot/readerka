@@ -44,7 +44,7 @@ fun translationUrl(text: String): String = Uri.Builder().scheme("https").authori
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.translation_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     IconButton(onClick = { failed = false; browser?.reload() }) { Icon(Icons.Default.Refresh, stringResource(R.string.retry_translation)) }
-                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("close-translation")) { Icon(Icons.Default.Close, stringResource(R.string.close)) }
+                    IconButton(onClick = onDismiss, modifier = Modifier.testTag("close-translation")) { Icon(Outline.Close, stringResource(R.string.close)) }
                 }
                 Text(text, maxLines = 2, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("translation-source"))

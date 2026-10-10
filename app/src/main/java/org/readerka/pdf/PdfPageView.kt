@@ -22,7 +22,12 @@ class PdfPageView(context: Context) : View(context) {
     var onSelection: (String, Anchor) -> Unit = { _, _ -> }
     var onHighlight: (Entry) -> Unit = {}
     var onCenterTap: () -> Unit = {}
+    var onPaneFocus: () -> Unit = {}
     var onNavigationKey: (KeyEvent) -> Boolean = { false }
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        if (gainFocus) onPaneFocus()
+    }
     var zoom = 1f
         private set
     private var panX = 0f
@@ -115,6 +120,7 @@ class PdfPageView(context: Context) : View(context) {
         paint.alpha = 255
     }
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) onPaneFocus()
         scaleDetector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {

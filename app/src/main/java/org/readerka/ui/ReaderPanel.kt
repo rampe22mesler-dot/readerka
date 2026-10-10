@@ -51,7 +51,7 @@ import org.readerka.data.*
     Column(modifier.padding(8.dp).testTag("reader-panel")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.structure_in_pdf), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, stringResource(R.string.close_reader_panel)) }
+            IconButton(onClick = onClose) { Icon(Outline.Close, stringResource(R.string.close_reader_panel)) }
         }
         Row {
             FilterChip(!bookmarksTab, { onTab(false) }, label = { Text(stringResource(R.string.quotes_in_pdf)) })
@@ -89,7 +89,7 @@ import org.readerka.data.*
                         }, modifier = Modifier.clickable { onBookmark(b) }.testTag("reader-bookmark-" + b.id))
                         Row {
                             TextButton(onClick = { onBookmark(b) }) { Text(stringResource(R.string.go)) }
-                            IconButton(onClick = { bookmarkEditor = b }) { Icon(Icons.Default.Edit, stringResource(R.string.edit)) }
+                            IconButton(onClick = { bookmarkEditor = b }) { Icon(Outline.Edit, stringResource(R.string.edit)) }
                             IconButton(onClick = { deleteBookmark = b }) { Icon(Icons.Default.Delete, stringResource(R.string.delete)) }
                         }
                     }

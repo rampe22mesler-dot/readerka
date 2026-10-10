@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.readerka.data
 
 import android.content.Context
@@ -9,12 +11,13 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
 data class EntryDraft(val entry: Entry, val tags: String = "", val collections: Set<String> = emptySet(),
-    val readerFolders: Set<String> = emptySet(), val modifiedAt: Long = System.currentTimeMillis())
+    val readerFolders: Set<String> = emptySet(), @EncodeDefault val modifiedAt: Long = System.currentTimeMillis())
 
 @Serializable
 data class ReadingLocation(val documentId: String, val page: Int, val offset: Int = 0)
@@ -36,8 +39,34 @@ data class ReadingHistory(val locations: List<ReadingLocation> = emptyList(), va
 }
 
 @Serializable
+enum class WorkspaceKind { Pdf, Note }
+
+@Serializable
+data class WorkspaceTab(val id: String, val documentId: String, val kind: WorkspaceKind,
+    val pinned: Boolean = false, val page: Int = 0, val offset: Int = 0)
+
+@Serializable
+data class WorkspacePane(val tabs: List<WorkspaceTab> = emptyList(), val selectedId: String? = null) {
+    val selected get() = tabs.firstOrNull { it.id == selectedId }
+    fun open(tab: WorkspaceTab): WorkspacePane = copy(tabs = if (tabs.any { it.id == tab.id }) tabs else tabs + tab, selectedId = tab.id)
+    fun close(id: String): WorkspacePane {
+        val index = tabs.indexOfFirst { it.id == id }
+        val remaining = tabs.filterNot { it.id == id }
+        return copy(tabs = remaining, selectedId = if (selectedId == id) remaining.getOrNull(index.coerceIn(0, (remaining.size - 1).coerceAtLeast(0)))?.id else selectedId)
+    }
+    fun move(id: String, delta: Int): WorkspacePane {
+        val index = tabs.indexOfFirst { it.id == id }
+        if (index < 0) return this
+        val target = (index + delta).coerceIn(0, tabs.lastIndex)
+        return copy(tabs = tabs.toMutableList().also { it.add(target, it.removeAt(index)) })
+    }
+}
+
+@Serializable
 data class WorkspaceState(val drafts: List<EntryDraft> = emptyList(), val activeDraftId: String? = null,
-    val history: ReadingHistory = ReadingHistory()) {
+    val history: ReadingHistory = ReadingHistory(), val panes: List<WorkspacePane> = listOf(WorkspacePane(), WorkspacePane()),
+    val activePane: Int = 0, val split: Boolean = false, val splitFraction: Float = .5f,
+    val sidebarWidth: Float = 260f, val structureWidth: Float = 280f, val sidebarVisible: Boolean = true) {
     val editor get() = drafts.firstOrNull { it.entry.id == activeDraftId }
 }
 

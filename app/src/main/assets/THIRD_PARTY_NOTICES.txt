@@ -14,3 +14,6 @@ licenses/PDFBox-NOTICE.txt.
 Bouncy Castle 1.72, Copyright The Legion of the Bouncy Castle Inc.
 Source: https://www.bouncycastle.org/
 License: see licenses/Bouncy-Castle.txt.
+
+CommonMark Java 0.24.0 — BSD 2-Clause; see licenses/CommonMark-BSD.txt.
+Workspace outline icons are original Readerka artwork.

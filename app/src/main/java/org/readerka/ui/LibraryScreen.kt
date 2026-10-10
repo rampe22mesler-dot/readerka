@@ -41,13 +41,13 @@ import org.readerka.data.*
                 { editedFolder = it; folderDialog = true }, Modifier.width(if (wide) 240.dp else 200.dp).fillMaxHeight())
             VerticalDivider()
         }
-        Column(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f).padding(if (LocalCompact.current) 12.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!workspace && !wide) IconButton(onClick = { foldersVisible = !foldersVisible }) { Icon(Icons.Default.Menu, stringResource(R.string.my_document_folders)) }
+                if (!workspace && !wide) IconButton(onClick = { foldersVisible = !foldersVisible }) { Icon(Outline.Menu, stringResource(R.string.my_document_folders)) }
                 Text(folders.firstOrNull { it.id == folder }?.name ?: stringResource(R.string.all_documents), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                Button(onClick = { onImport(folder) }) { Icon(Icons.Default.Add, null); Text(stringResource(R.string.add_pdf)) }
+                TextButton(onClick = { onImport(folder) }) { Icon(Outline.Plus, null); Text(stringResource(R.string.add_pdf)) }
             }
-            OutlinedTextField(search, { search = it }, label = { Text(stringResource(R.string.search_documents)) }, singleLine = true, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Icons.Default.Search, null) })
+            OutlinedTextField(search, { search = it }, label = { Text(stringResource(R.string.search_documents)) }, singleLine = true, modifier = Modifier.fillMaxWidth(), leadingIcon = { Icon(Outline.Search, null) })
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FilterChip(recent, { recent = !recent }, label = { Text(stringResource(R.string.sort_recent)) })
                 Spacer(Modifier.width(8.dp))
@@ -57,14 +57,14 @@ import org.readerka.data.*
             else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(docs, key = { it.id }) { doc ->
                     Card(Modifier.fillMaxWidth().clickable { vm.open(doc) }) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.padding(if (LocalCompact.current) 12.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(doc.title, style = MaterialTheme.typography.titleLarge)
                                 if (doc.authors.isNotBlank()) Text(doc.authors, style = MaterialTheme.typography.bodyMedium)
                                 Text(doc.originalName, style = MaterialTheme.typography.bodySmall)
                                 Text(stringResource(R.string.page, doc.lastPage + 1, doc.pageCount), style = MaterialTheme.typography.labelMedium)
                             }
-                            IconButton(onClick = { editedDocument = doc }) { Icon(Icons.Default.Edit, stringResource(R.string.edit)) }
+                            IconButton(onClick = { editedDocument = doc }) { Icon(Outline.Edit, stringResource(R.string.edit)) }
                         }
                     }
                 }

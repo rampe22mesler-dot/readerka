@@ -141,6 +141,9 @@ class ReaderControlsTest {
         compose.waitUntil(30_000) { compose.runOnUiThread { view.highlights.any { it.id == entry.id } } }
         val highlighted = compose.runOnUiThread { view.screenRect(entry.anchor!!.rects.first()) }
         tap(view, highlighted.centerX(), highlighted.centerY())
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-editor").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("note-properties").performClick()
+        compose.onNodeWithTag("delete-quote").performScrollTo()
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("delete-quote").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("delete-quote").performClick()
         compose.onNodeWithTag("confirm-delete").performClick()

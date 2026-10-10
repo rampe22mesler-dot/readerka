@@ -19,7 +19,7 @@ import org.readerka.pdf.PdfEngine
 import java.io.File
 import java.util.UUID
 
-data class ReaderSession(val document: Document, val engine: PdfEngine, val page: Int, val offset: Int, val anchor: Anchor? = null, val token: String = UUID.randomUUID().toString())
+data class ReaderSession(val document: Document, val engine: PdfEngine, val page: Int, val offset: Int, val anchor: Anchor? = null, val token: String = UUID.randomUUID().toString(), val pane: Int = 0, val tabId: String = document.id)
 data class Busy(val label: Int, val progress: Float? = null)
 enum class ExportKind { Obsidian, Backup, Markdown, Csv }
 enum class ReaderTool { Search, Quotes, Bookmarks, Page }
@@ -49,7 +49,10 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     var exportIds: Set<String>?
         get() = savedState.get<List<String>>("export-ids")?.toSet()
         set(value) { savedState["export-ids"] = value?.toList() }
-    private var opening: Job? = null
+    private val opening = mutableMapOf<Int, Job>()
+    private val _readers = MutableStateFlow<Map<Int, ReaderSession>>(emptyMap())
+    val readers = _readers.asStateFlow()
+    var readerKeyHandler: ((android.view.KeyEvent) -> Boolean)? = null
     private val workspaceStore = WorkspaceStore(application)
     private val _workspace = MutableStateFlow(WorkspaceState())
     val workspace = _workspace.asStateFlow()
@@ -67,13 +70,19 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
                 _draftStatus.value = "Черновик сохранён"
                 workspaceReady.complete(Unit)
                 val data = repository.snapshots.first()
-                val id = _workspace.value.editor?.entry?.documentId ?: savedState.get<String>("document") ?: _workspace.value.history.current?.documentId
-                data.documents.firstOrNull { it.id == id }?.let { document ->
-                    val location = _workspace.value.history.current?.takeIf { it.documentId == id }
-                    open(if (location != null) document.copy(lastPage = location.page, lastOffset = location.offset) else document,
-                        navigate = _workspace.value.editor?.entry?.documentId != null, recordHistory = _workspace.value.history.current?.documentId != document.id)
+                // Additive migration: old drafts/history remain intact; Room/backup schemas stay at 2.
+                if (_workspace.value.panes.all { it.tabs.isEmpty() }) {
+                    val state = _workspace.value
+                    val doc = data.documents.firstOrNull { it.id == (savedState.get<String>("document") ?: state.history.current?.documentId) }
+                    val pdf = doc?.let { WorkspaceTab(UUID.randomUUID().toString(), it.id, WorkspaceKind.Pdf, page = state.history.current?.page ?: it.lastPage, offset = state.history.current?.offset ?: it.lastOffset) }
+                    val note = state.editor?.let { WorkspaceTab(UUID.randomUUID().toString(), it.entry.id, WorkspaceKind.Note) }
+                    _workspace.value = state.copy(panes = listOf(WorkspacePane().let { if (pdf != null) it.open(pdf) else if (note != null) it.open(note) else it }, WorkspacePane().let { if (pdf != null && note != null) it.open(note) else it }), split = pdf != null && note != null, activePane = if (pdf != null && note != null) 1 else 0)
                 }
-                if (_workspace.value.editor?.entry?.documentId == null && _workspace.value.editor != null) navigate("notes")
+                for ((pane, state) in _workspace.value.panes.withIndex()) {
+                    val tab = state.selected ?: continue
+                    if (tab.kind == WorkspaceKind.Pdf) data.documents.firstOrNull { it.id == tab.documentId }?.let { open(it, page = tab.page, navigate = false, recordHistory = false, pane = pane, tabId = tab.id, offset = tab.offset) }
+                }
+                if (_workspace.value.panes.any { it.tabs.isNotEmpty() }) navigate("reader")
                 for (ignored in workspaceWrites) {
                     try { persistWorkspace() }
                     catch (e: CancellationException) { throw e }
@@ -93,41 +102,114 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
         workspaceStore.save(state)
         if (_workspace.value == state) _draftStatus.value = "Черновик сохранён"
     }
-    fun editEntry(entry: Entry) = perform {
+    fun editEntry(entry: Entry, pane: Int = _workspace.value.activePane, collection: String? = null) = perform {
         workspaceReady.await()
         if (_editorSaving.value) return@perform
         val data = repository.dao.snapshot()
         val draft = _workspace.value.drafts.firstOrNull { it.entry.id == entry.id } ?: EntryDraft(entry,
             data.entryTags.filter { it.entryId == entry.id }.mapNotNull { link -> data.tags.firstOrNull { it.id == link.tagId }?.name }.joinToString(", "),
-            data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet(),
+            data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet() + setOfNotNull(collection),
             data.readerMemberships.filter { it.entryId == entry.id }.map { it.folderId }.toSet())
         changeWorkspace(_workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id == entry.id } + draft, activeDraftId = entry.id))
+        openNoteTab(entry.id, pane)
     }
-    fun newNote(documentId: String? = null) {
-        if (documentId == null) navigate("notes")
-        editEntry(Entry(UUID.randomUUID().toString(), "", documentId = documentId, color = preferences.value.defaultColor))
+    fun editBeside(entry: Entry, pane: Int) { layout(split = true); editEntry(entry, 1 - pane) }
+    fun newNote(documentId: String? = null, collection: String? = null) {
+        val active = _workspace.value.activePane
+        val pane = if (_workspace.value.panes[active].selected?.kind == WorkspaceKind.Pdf) 1 - active else active
+        if (pane != active) changeWorkspace(_workspace.value.copy(split = true))
+        editEntry(Entry(UUID.randomUUID().toString(), "", documentId = documentId, color = preferences.value.defaultColor), pane, collection)
     }
     fun updateDraft(draft: EntryDraft) {
-        if (_editorSaving.value || _workspace.value.activeDraftId != draft.entry.id) return
+        if (_editorSaving.value || _workspace.value.drafts.none { it.entry.id == draft.entry.id }) return
         changeWorkspace(_workspace.value.copy(drafts = _workspace.value.drafts.map { if (it.entry.id == draft.entry.id) draft.copy(modifiedAt = System.currentTimeMillis()) else it }))
     }
-    fun closeEditor() { if (!_editorSaving.value) changeWorkspace(_workspace.value.copy(activeDraftId = null)) }
+    fun closeEditor() {
+        if (_editorSaving.value) return
+        val state = _workspace.value
+        val pane = state.activePane
+        val tab = state.panes[pane].selected
+        if (tab?.kind == WorkspaceKind.Note && state.drafts.any { it.entry.id == tab.documentId }) closeTab(pane, tab.id)
+        focusPane(pane)
+    }
     fun resumeDraft(draft: EntryDraft) {
         if (_editorSaving.value) return
         changeWorkspace(_workspace.value.copy(activeDraftId = draft.entry.id))
-        val document = library.value.documents.firstOrNull { it.id == draft.entry.documentId }
-        if (document != null) open(document, draft.entry.anchor) else navigate("notes")
+        openNoteTab(draft.entry.id, _workspace.value.activePane)
+    }
+    private fun openNoteTab(id: String, pane: Int) {
+        val state = _workspace.value
+        val old = state.panes[pane]
+        val tab = old.tabs.firstOrNull { it.documentId == id && it.kind == WorkspaceKind.Note } ?: WorkspaceTab(UUID.randomUUID().toString(), id, WorkspaceKind.Note)
+        setPane(pane, old.open(tab))
+        focusPane(pane); navigate("reader")
+    }
+    fun openNote(entry: Entry, pane: Int = _workspace.value.activePane) { openNoteTab(entry.id, pane) }
+    fun focusPane(pane: Int) {
+        val state = _workspace.value
+        val tab = state.panes[pane].selected
+        val draftId = tab?.documentId?.takeIf { tab.kind == WorkspaceKind.Note && state.drafts.any { d -> d.entry.id == it } }
+        if (state.activePane != pane || state.activeDraftId != draftId) changeWorkspace(state.copy(activePane = pane, activeDraftId = draftId))
+        _reader.value = _readers.value[pane]
+    }
+    private fun setPane(pane: Int, value: WorkspacePane) { changeWorkspace(_workspace.value.copy(panes = _workspace.value.panes.toMutableList().also { it[pane] = value })) }
+    fun layout(split: Boolean = _workspace.value.split, fraction: Float = _workspace.value.splitFraction,
+        sidebarWidth: Float = _workspace.value.sidebarWidth, structureWidth: Float = _workspace.value.structureWidth, sidebarVisible: Boolean = _workspace.value.sidebarVisible) {
+        changeWorkspace(_workspace.value.copy(split = split, splitFraction = fraction.coerceIn(.3f, .7f), sidebarWidth = sidebarWidth.coerceIn(200f, 400f), structureWidth = structureWidth.coerceIn(220f, 400f), sidebarVisible = sidebarVisible))
+        if (!split) focusPane(0)
+    }
+    fun selectTab(pane: Int, id: String) {
+        val state = _workspace.value.panes[pane]
+        val tab = state.tabs.firstOrNull { it.id == id } ?: return
+        setPane(pane, state.copy(selectedId = id)); focusPane(pane); navigate("reader")
+        if (tab.kind == WorkspaceKind.Pdf) library.value.documents.firstOrNull { it.id == tab.documentId }?.let { open(it, page = tab.page, recordHistory = false, pane = pane, tabId = id, offset = tab.offset) }
+        else changeWorkspace(_workspace.value.copy(activeDraftId = tab.documentId.takeIf { note -> _workspace.value.drafts.any { it.entry.id == note } }))
+    }
+    fun closeTab(pane: Int, id: String) {
+        if (_editorSaving.value) return
+        val old = _workspace.value.panes[pane]
+        if (old.selectedId == id) opening[pane]?.cancel()
+        setPane(pane, old.close(id))
+        if (old.selectedId == id) {
+            _readers.value[pane]?.engine?.let { viewModelScope.launch(Dispatchers.IO) { it.close() } }
+            _readers.value = _readers.value - pane
+            if (_workspace.value.activePane == pane) _reader.value = null
+            _workspace.value.panes[pane].selectedId?.let { selectTab(pane, it) }
+        }
+        if (_workspace.value.panes.none { it.selected?.kind == WorkspaceKind.Note }) changeWorkspace(_workspace.value.copy(activeDraftId = null))
+    }
+    fun pinTab(pane: Int, id: String) { val old = _workspace.value.panes[pane]; setPane(pane, old.copy(tabs = old.tabs.map { if (it.id == id) it.copy(pinned = !it.pinned) else it }.sortedByDescending { it.pinned })) }
+    fun moveTab(pane: Int, id: String, delta: Int) { setPane(pane, _workspace.value.panes[pane].move(id, delta)) }
+    fun openRight(tab: WorkspaceTab, from: Int = _workspace.value.activePane) {
+        val pane = 1 - from
+        layout(split = true)
+        if (tab.kind == WorkspaceKind.Pdf) library.value.documents.firstOrNull { it.id == tab.documentId }?.let { open(it, page = tab.page, pane = pane, offset = tab.offset) }
+        else openNoteTab(tab.documentId, pane)
+    }
+    fun nextTab(delta: Int) { val pane = _workspace.value.activePane; val state = _workspace.value.panes[pane]; if (state.tabs.isNotEmpty()) selectTab(pane, state.tabs[Math.floorMod(state.tabs.indexOfFirst { it.id == state.selectedId } + delta, state.tabs.size)].id) }
+    fun insertQuote(text: String, document: Document, page: Int) {
+        val existing = _workspace.value.drafts.firstOrNull { it.entry.id == _workspace.value.panes[1 - _workspace.value.activePane].selected?.documentId }
+        val snippet = "\n> " + text.replace("\n", "\n> ") + "\n\n[" + document.title.replace("]", "") + " · " + (page + 1) + "](readerka://document/" + document.id + "?page=" + (page + 1) + ")\n"
+        val targetId = _workspace.value.panes[1 - _workspace.value.activePane].selected?.takeIf { it.kind == WorkspaceKind.Note }?.documentId
+        val canonical = library.value.entries.firstOrNull { it.id == targetId }
+        if (existing == null && canonical != null) {
+            val pane = 1 - _workspace.value.activePane
+            perform { editEntry(canonical, pane).join(); _workspace.value.drafts.firstOrNull { it.entry.id == canonical.id }?.let { updateDraft(it.copy(entry = it.entry.copy(comment = it.entry.comment + snippet))) } }
+        }
+        else if (existing != null) updateDraft(existing.copy(entry = existing.entry.copy(comment = existing.entry.comment + snippet)))
+        else { val pane = 1 - _workspace.value.activePane; layout(split = true); editEntry(Entry(UUID.randomUUID().toString(), "Конспект · " + document.title, comment = snippet, documentId = document.id), pane) }
     }
     fun discardDraft(id: String) = perform {
         workspaceReady.await()
         if (_editorSaving.value && _workspace.value.activeDraftId == id) return@perform
         changeWorkspace(_workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id == id }, activeDraftId = _workspace.value.activeDraftId?.takeUnless { it == id }))
+        if (library.value.entries.none { it.id == id }) _workspace.value.panes.forEachIndexed { pane, state -> state.tabs.filter { it.kind == WorkspaceKind.Note && it.documentId == id }.forEach { closeTab(pane, it.id) } }
         persistWorkspace()
     }
-    fun saveEditor() = perform {
+    fun saveEditor(id: String? = _workspace.value.activeDraftId) = perform {
         workspaceReady.await()
         if (_editorSaving.value) return@perform
-        val draft = _workspace.value.editor ?: return@perform
+        val draft = _workspace.value.drafts.firstOrNull { it.entry.id == id } ?: return@perform
         if (draft.entry.title.isBlank()) return@perform
         _editorSaving.value = true
         try {
@@ -137,10 +219,10 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
                 draft.readerFolders.intersect(data.readerFolders.filter { it.documentId == draft.entry.documentId && it.kind == ReaderFolderKind.Quotes }.map { it.id }.toSet()))
             // Stable entry IDs make retries safe even if the disk write below fails after the Room transaction.
             workspaceLock.withLock {
-                val state = _workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id == draft.entry.id }, activeDraftId = null)
+                val state = _workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id == draft.entry.id }, activeDraftId = _workspace.value.activeDraftId?.takeUnless { it == draft.entry.id })
                 workspaceStore.save(state)
                 // Reading may continue while the disk write is suspended. Keep its newest history.
-                val latest = _workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id == draft.entry.id }, activeDraftId = null)
+                val latest = _workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id == draft.entry.id }, activeDraftId = _workspace.value.activeDraftId?.takeUnless { it == draft.entry.id })
                 _workspace.value = latest
                 if (latest == state) _draftStatus.value = "Черновик сохранён" else workspaceWrites.trySend(Unit)
             }
@@ -155,14 +237,24 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
         if (target == history) return
         val location = target.current ?: return
         val document = library.value.documents.firstOrNull { it.id == location.documentId } ?: return
-        open(document.copy(lastPage = location.page, lastOffset = location.offset), recordHistory = false,
+        open(document, page = location.page, offset = location.offset, recordHistory = false,
             onOpened = { changeWorkspace(_workspace.value.copy(history = target)) })
     }
-    fun trackPosition(documentId: String, page: Int, offset: Int) {
-        if (_reader.value?.document?.id != documentId) return
-        _reader.value?.takeIf { it.document.id == documentId }?.let { _reader.value = it.copy(page = page, offset = offset) }
-        val history = _workspace.value.history.update(ReadingLocation(documentId, page, offset))
-        if (history != _workspace.value.history) changeWorkspace(_workspace.value.copy(history = history))
+    fun trackNotePosition(pane: Int, id: String, offset: Int) {
+        val old = _workspace.value.panes[pane]
+        if (old.tabs.none { it.kind == WorkspaceKind.Note && it.documentId == id && it.offset != offset }) return
+        setPane(pane, old.copy(tabs = old.tabs.map { if (it.kind == WorkspaceKind.Note && it.documentId == id) it.copy(offset = offset) else it }))
+    }
+    fun trackPosition(documentId: String, page: Int, offset: Int, pane: Int = _workspace.value.activePane, tabId: String? = null) {
+        val session = _readers.value[pane]?.takeIf { it.document.id == documentId } ?: return
+        val current = session.copy(page = page, offset = offset)
+        _readers.value = _readers.value + (pane to current)
+        if (pane == _workspace.value.activePane) _reader.value = current
+        val old = _workspace.value.panes[pane]
+        val tabs = old.tabs.map { if (it.id == (tabId ?: session.tabId)) it.copy(page = page, offset = offset) else it }
+        val history = if (pane == _workspace.value.activePane) _workspace.value.history.update(ReadingLocation(documentId, page, offset)) else _workspace.value.history
+        val state = _workspace.value.copy(panes = _workspace.value.panes.toMutableList().also { it[pane] = old.copy(tabs = tabs) }, history = history)
+        if (state != _workspace.value) changeWorkspace(state)
     }
     private fun recordLocation(session: ReaderSession) {
         changeWorkspace(_workspace.value.copy(history = _workspace.value.history.visit(ReadingLocation(session.document.id, session.page, session.offset))))
@@ -186,58 +278,44 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
         }
         messages.emit(context().getString(R.string.import_result, uris.size - failed, failed))
     }
-    fun open(document: Document, anchor: Anchor? = null, page: Int? = null, navigate: Boolean = true, recordHistory: Boolean = true, onOpened: () -> Unit = {}) {
-        val existing = _reader.value
-        if (existing?.document?.id == document.id) {
-            _reader.value = existing.copy(document = document, page = (page ?: anchor?.page ?: document.lastPage).coerceIn(0, existing.engine.pageCount - 1),
-                offset = if (page == null && anchor == null) document.lastOffset else 0, anchor = anchor, token = UUID.randomUUID().toString())
-            if (navigate) this.navigate("reader")
-            rememberOpenDocument(document.id)
-            if (recordHistory) recordLocation(_reader.value!!)
+    fun open(document: Document, anchor: Anchor? = null, page: Int? = null, navigate: Boolean = true, recordHistory: Boolean = true, onOpened: () -> Unit = {}, pane: Int = _workspace.value.activePane, tabId: String? = null, offset: Int? = null) {
+        val paneState = _workspace.value.panes[pane]
+        val tab = paneState.tabs.firstOrNull { it.id == tabId } ?: paneState.tabs.firstOrNull { it.kind == WorkspaceKind.Pdf && it.documentId == document.id }
+            ?: WorkspaceTab(UUID.randomUUID().toString(), document.id, WorkspaceKind.Pdf, page = document.lastPage, offset = document.lastOffset)
+        setPane(pane, paneState.open(tab))
+        if (navigate) { focusPane(pane); this.navigate("reader") }
+        val existing = _readers.value[pane]
+        val targetPage = page ?: anchor?.page ?: tab.page
+        val targetOffset = offset ?: if (page == null && anchor == null) tab.offset else 0
+        fun install(engine: PdfEngine) {
+            val session = ReaderSession(document, engine, targetPage.coerceIn(0, engine.pageCount - 1), targetOffset, anchor, pane = pane, tabId = tab.id)
+            _readers.value = _readers.value + (pane to session)
+            if (pane == _workspace.value.activePane) _reader.value = session
+            if (document.id !in openDocumentIds.value) savedState["open-documents"] = ArrayList(openDocumentIds.value + document.id)
+            if (recordHistory) recordLocation(session)
             onOpened()
-            return
         }
-        opening?.cancel()
-        opening = perform(R.string.opening) {
-            var newEngine: PdfEngine? = null
+        opening[pane]?.cancel()
+        if (existing?.document?.id == document.id) { install(existing.engine); return }
+        opening[pane] = perform {
+            var engine: PdfEngine? = null
             try {
-                withContext(Dispatchers.IO) { newEngine = PdfEngine(repository.pdfFile(document), context().cacheDir) }
-                val engine = newEngine!!
-                val old = _reader.value
-                _reader.value = ReaderSession(document, engine, (page ?: anchor?.page ?: document.lastPage).coerceIn(0, engine.pageCount - 1), if (anchor == null && page == null) document.lastOffset else 0, anchor)
-                newEngine = null
-                old?.engine?.let { withContext(Dispatchers.IO) { it.close() } }
-                savedState["document"] = document.id
-                rememberOpenDocument(document.id)
-                if (navigate) this@LibraryViewModel.navigate("reader")
-                if (recordHistory) recordLocation(_reader.value!!)
-                onOpened()
-            } finally { newEngine?.let { withContext(NonCancellable + Dispatchers.IO) { it.close() } } }
+                engine = withContext(Dispatchers.IO) { PdfEngine(repository.pdfFile(document), context().cacheDir) }
+                install(engine!!); engine = null
+                existing?.engine?.let { withContext(Dispatchers.IO) { it.close() } }
+            } finally { engine?.let { withContext(NonCancellable + Dispatchers.IO) { it.close() } } }
         }
-    }
-    private fun rememberOpenDocument(id: String) {
-        if (id !in openDocumentIds.value) savedState["open-documents"] = ArrayList(openDocumentIds.value + id)
     }
     fun closeDocument(id: String) {
-        val ids = openDocumentIds.value
-        val index = ids.indexOf(id)
-        val remaining = ids.filterNot { it == id }
-        savedState["open-documents"] = ArrayList(remaining)
-        if (_reader.value?.document?.id != id) return
-        val engine = _reader.value?.engine
-        _reader.value = null
-        savedState["document"] = null
-        engine?.let { viewModelScope.launch(Dispatchers.IO) { it.close() } }
-        val next = remaining.getOrNull(index.coerceAtLeast(0).coerceAtMost((remaining.size - 1).coerceAtLeast(0)))
-        val document = library.value.documents.firstOrNull { it.id == next }
-        if (document != null) open(document) else navigate("library")
+        for ((pane, state) in _workspace.value.panes.withIndex()) state.tabs.filter { it.documentId == id && it.kind == WorkspaceKind.Pdf }.forEach { closeTab(pane, it.id) }
+        savedState["open-documents"] = ArrayList(openDocumentIds.value.filterNot { it == id })
     }
     fun source(entry: Entry) { library.value.documents.firstOrNull { it.id == entry.documentId }?.let { open(it, entry.anchor) } }
     fun position(document: Document, page: Int, offset: Int) = perform {
         repository.dao.savePosition(document.id, page, offset, System.currentTimeMillis())
     }
-    fun highlight(text: String, anchor: Anchor, color: Marker): Job? {
-        val doc = _reader.value?.document ?: return null
+    fun highlight(text: String, anchor: Anchor, color: Marker, document: Document? = _reader.value?.document): Job? {
+        val doc = document ?: return null
         return perform {
         repository.dao.putEntry(Entry(UUID.randomUUID().toString(), text.lineSequence().first().take(80), text,
             documentId = doc.id, anchor = anchor, type = NoteType.Quote, color = color))
@@ -248,7 +326,7 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     fun saveBookmark(value: Bookmark) = perform { repository.saveBookmark(value) }
     fun openBookmark(value: Bookmark) {
         library.value.documents.firstOrNull { it.id == value.documentId }?.let { document ->
-            open(document.copy(lastPage = value.page, lastOffset = value.offset))
+            open(document, page = value.page, offset = value.offset)
         }
     }
     fun saveDocument(document: Document, tags: String) = perform { repository.saveDocument(document, tags) }
@@ -258,6 +336,7 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     fun deleteEntries(ids: Set<String>) = perform {
         workspaceReady.await()
         repository.dao.deleteEntries(ids.toList())
+        _workspace.value.panes.forEachIndexed { pane, state -> state.tabs.filter { it.kind == WorkspaceKind.Note && it.documentId in ids }.forEach { closeTab(pane, it.id) } }
         changeWorkspace(_workspace.value.copy(drafts = _workspace.value.drafts.filterNot { it.entry.id in ids }, activeDraftId = _workspace.value.activeDraftId?.takeUnless { it in ids }))
         persistWorkspace()
     }
@@ -297,5 +376,5 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
         }
         message(R.string.restore_done)
     }
-    override fun onCleared() { opening?.cancel(); val engine = _reader.value?.engine; if (engine != null) CoroutineScope(Dispatchers.IO).launch { engine.close() }; super.onCleared() }
+    override fun onCleared() { opening.values.forEach { it.cancel() }; _readers.value.values.forEach { session -> CoroutineScope(Dispatchers.IO).launch { session.engine.close() } }; super.onCleared() }
 }

@@ -55,9 +55,6 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         val scope = rememberCoroutineScope()
         var selection by remember { mutableStateOf<Selection?>(null) }
         val workspace by vm.workspace.collectAsState()
-        val edited = workspace.editor
-        var editorHasFocus by remember { mutableStateOf(false) }
-        LaunchedEffect(edited?.entry?.id) { if (edited == null) editorHasFocus = false }
         var positioned by remember(session.token) { mutableStateOf(false) }
         var showPanel by rememberSaveable { mutableStateOf(false) }
         var bookmarksTab by rememberSaveable { mutableStateOf(false) }
@@ -67,14 +64,16 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         var bookmark by remember { mutableStateOf<Bookmark?>(null) }
         var pageInput by remember { mutableStateOf("") }
         var search by remember { mutableStateOf(false) }
+        var properties by remember { mutableStateOf(false) }
         var translation by rememberSaveable { mutableStateOf<String?>(null) }
         val requestedTool by vm.readerTool.collectAsState()
         val currentPage by remember { derivedStateOf { list.firstVisibleItemIndex.coerceIn(0, session.engine.pageCount - 1) } }
-        LaunchedEffect(requestedTool) {
+        LaunchedEffect(requestedTool, allowPageKeys) {
+            if (!allowPageKeys) return@LaunchedEffect
             when (requestedTool) {
                 ReaderTool.Search -> search = true
-                ReaderTool.Quotes -> { vm.closeEditor(); showPanel = true; bookmarksTab = false }
-                ReaderTool.Bookmarks -> { vm.closeEditor(); showPanel = true; bookmarksTab = true }
+                ReaderTool.Quotes -> { showPanel = true; bookmarksTab = false }
+                ReaderTool.Bookmarks -> { showPanel = true; bookmarksTab = true }
                 ReaderTool.Page -> { pageInput = (currentPage + 1).toString(); jump = true }
                 null -> return@LaunchedEffect
             }
@@ -103,7 +102,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             if (viewport.width <= 0 || viewport.height <= 0) return@LaunchedEffect
             snapshotFlow { if (positioned) list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset else null }.filterNotNull()
                 .map { (page, offset) -> page to (offset / pageHeight(page) * 10_000).toInt().coerceIn(0, 10_000) }
-                .distinctUntilChanged().onEach { (page, offset) -> vm.trackPosition(session.document.id, page, offset) }
+                .distinctUntilChanged().onEach { (page, offset) -> vm.trackPosition(session.document.id, page, offset, session.pane, session.tabId) }
                 .debounce(350).collect { (page, offset) -> vm.position(session.document, page, offset) }
         }
         fun go(page: Int) {
@@ -111,11 +110,10 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             // A focused native canvas otherwise asks the lazy list to reveal its old item
             // while the explicit page jump is being measured.
             (activity?.currentFocus as? PdfPageView)?.clearFocus()
-            vm.open(session.document, page = page.coerceIn(0, session.engine.pageCount - 1), recordHistory = false)
+            vm.open(session.document, page = page.coerceIn(0, session.engine.pageCount - 1), recordHistory = false, pane = session.pane, tabId = session.tabId)
         }
         val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
-            if (onWorkspaceShortcut(event)) true
-            else if (!allowPageKeys || (edited != null && editorHasFocus) || bookmark != null || jump || search || translation != null) false
+            if (!allowPageKeys || bookmark != null || jump || search || translation != null) false
             else {
                 val target = when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> currentPage + 1
@@ -128,73 +126,72 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 else { if (event.action == KeyEvent.ACTION_DOWN) go(target); true }
             }
         })
-        DisposableEffect(activity, session.engine) {
-            val window = activity?.window
-            val previous = window?.callback
-            val handler = previous?.let {
-                object : Window.Callback by it {
-                    override fun dispatchKeyEvent(event: KeyEvent): Boolean = keyHandler(event) || it.dispatchKeyEvent(event)
-                }
-            }
-            if (handler != null) window.callback = handler
-            onDispose { if (window?.callback === handler) window?.callback = previous }
+        DisposableEffect(session.engine, allowPageKeys) {
+            val handler: (KeyEvent) -> Boolean = { keyHandler(it) }
+            if (allowPageKeys) vm.readerKeyHandler = handler
+            onDispose { if (vm.readerKeyHandler === handler) vm.readerKeyHandler = null }
         }
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(session.document.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).padding(8.dp), maxLines = 1)
-                TextButton(onClick = { quickPages = !quickPages }, modifier = Modifier.testTag("reader-page-counter")) { Text(stringResource(R.string.page, currentPage + 1, session.engine.pageCount)) }
-                IconButton(onClick = { onFullscreen(!fullscreen) }) { Icon(if (fullscreen) Icons.Default.Close else Icons.Default.MoreVert, stringResource(R.string.fullscreen)) }
-            }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { showPanel = !showPanel || bookmarksTab; bookmarksTab = false }, modifier = Modifier.testTag("reader-quotes-button")) { Text(stringResource(R.string.quotes_in_pdf)) }
-                TextButton(onClick = { showPanel = !showPanel || !bookmarksTab; bookmarksTab = true }, modifier = Modifier.testTag("reader-bookmarks-button")) { Text(stringResource(R.string.bookmarks)) }
-                IconButton(onClick = {
-                    bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = if (session.page == currentPage) session.offset else 0)
-                }) { Icon(Icons.Default.Star, stringResource(R.string.bookmark)) }
-                IconButton(onClick = { vm.newNote(session.document.id); showPanel = false }) { Icon(Icons.Default.Edit, stringResource(R.string.create_note)) }
-                IconButton(onClick = { search = true }) { Icon(Icons.Default.Search, stringResource(R.string.search_pdf)) }
-                TextButton(onClick = { fitPage = !fitPage; go(currentPage) }) { Text(stringResource(if (fitPage) R.string.fit_width else R.string.fit_page)) }
-            }
-            if (!fullscreen && selection == null) Text(stringResource(R.string.reader_hint), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 12.dp), maxLines = 2)
-            selection?.let { s ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                    Text(s.text, maxLines = 2, style = MaterialTheme.typography.bodySmall)
+        val selectionActions: @Composable () -> Unit = { selection?.let { s ->
+                Surface(tonalElevation = 3.dp, shadowElevation = 6.dp, shape = MaterialTheme.shapes.medium) { Column(Modifier.widthIn(max = 680.dp).padding(8.dp)) {
+                    Text(s.text, maxLines = 1, style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text))
                             translation = s.text
                         }) { Text(stringResource(R.string.translate)) }
                         TextButton(onClick = {
-                            vm.editEntry(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
-                                documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor)); showPanel = false
+                            vm.editBeside(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
+                                documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor), session.pane)
                         }) { Text(stringResource(R.string.comment)) }
+                        TextButton(onClick = { vm.focusPane(session.pane); vm.insertQuote(s.text, session.document, s.anchor.page) }) { Text("В конспект") }
                         TextButton(onClick = { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text)) }) { Text(stringResource(R.string.copy)) }
-                        IconButton(onClick = { s.view.clearSelection(); selection = null }) { Icon(Icons.Default.Close, stringResource(R.string.clear_selection)) }
-                        ColorPalette(null) { color -> vm.highlight(s.text, s.anchor, color); s.view.clearSelection(); selection = null }
+                        IconButton(onClick = { s.view.clearSelection(); selection = null }) { Icon(Outline.Close, stringResource(R.string.clear_selection)) }
+                        ColorPalette(null) { color -> vm.highlight(s.text, s.anchor, color, session.document); s.view.clearSelection(); selection = null }
+                    }
+                }
+            } } }
+        Column(Modifier.fillMaxSize()) {
+            var help by remember { mutableStateOf(false) }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                WorkspaceAction(Outline.Note, "Цитаты в PDF", { showPanel = !showPanel || bookmarksTab; bookmarksTab = false }, Modifier.testTag("reader-quotes-button"), selected = showPanel && !bookmarksTab)
+                WorkspaceAction(Outline.Bookmark, "Закладки", { showPanel = !showPanel || !bookmarksTab; bookmarksTab = true }, Modifier.testTag("reader-bookmarks-button"), selected = showPanel && bookmarksTab)
+                WorkspaceAction(Outline.Plus, "Добавить закладку", { bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = session.offset) })
+                WorkspaceAction(Outline.Edit, "Создать конспект", { vm.focusPane(session.pane); vm.newNote(session.document.id) })
+                WorkspaceAction(Outline.Search, "Поиск в PDF", { search = true })
+                WorkspaceAction(Outline.Settings, "Свойства PDF", { properties = true })
+                TextButton(onClick = { quickPages = !quickPages }, modifier = Modifier.heightIn(min = 48.dp).testTag("reader-page-counter")) { Text(stringResource(R.string.page, currentPage + 1, session.engine.pageCount)) }
+                TextButton(onClick = { fitPage = !fitPage; go(currentPage) }) { Text(stringResource(if (fitPage) R.string.fit_width else R.string.fit_page)) }
+                WorkspaceAction(Outline.Split, "Открыть справа", { vm.openRight(WorkspaceTab(session.tabId, session.document.id, WorkspaceKind.Pdf, page = currentPage, offset = session.offset), session.pane) })
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    WorkspaceAction(Outline.More, "Действия PDF", { menu = true })
+                    DropdownMenu(menu, { menu = false }) {
+                        DropdownMenuItem(text = { Text("Справка по чтению") }, onClick = { menu = false; help = true })
+                        DropdownMenuItem(text = { Text(if (fullscreen) "Выйти из полного экрана" else "Полный экран") }, onClick = { menu = false; onFullscreen(!fullscreen) })
                     }
                 }
             }
+            HorizontalDivider()
+            if (help) AlertDialog(onDismissRequest = { help = false }, title = { Text("Чтение PDF") }, text = { Text(stringResource(R.string.reader_hint) + "\n\nКоснитесь счётчика страниц для быстрого перехода. Удерживайте слово для выделения; ручки меняют границы. Стрелки и Page Up/Down работают в активной области PDF.") }, confirmButton = { TextButton(onClick = { help = false }) { Text("Понятно") } })
             Row(Modifier.weight(1f)) {
                 if (!wide && showPanel) {
                     ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                        { vm.editEntry(it) }, { vm.source(it); showPanel = false }, { vm.openBookmark(it); showPanel = false }, { showPanel = false }, Modifier.fillMaxSize())
+                        { vm.editBeside(it, session.pane) }, { vm.source(it); showPanel = false }, { vm.openBookmark(it); showPanel = false }, { showPanel = false }, Modifier.fillMaxSize())
                 } else {
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().onSizeChanged { viewport = it }) {
                         LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("pdf-pages"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(session.engine.pageCount, key = { it }) { index ->
                                 PdfPage(session, index, maxWidth, maxHeight, fitPage, docEntries.filter { it.anchor?.page == index },
                                     { text, anchor, view -> selection?.view?.takeIf { it !== view }?.clearSelection(); selection = Selection(text, anchor, view) },
-                                    { vm.editEntry(it) }, { quickPages = !quickPages }, { keyHandler(it) })
+                                    { vm.editBeside(it, session.pane) }, { quickPages = !quickPages }, { keyHandler(it) }, { vm.focusPane(session.pane) })
                             }
                         }
+                        Box(Modifier.align(Alignment.BottomCenter).padding(12.dp).testTag("selection-actions")) { selectionActions() }
                     }
-                    if (wide && edited != null) {
-                        VerticalDivider()
-                        DraftEditor(edited, data, vm, inline = true, onEditorFocus = { editorHasFocus = it })
-                    } else if (wide && showPanel) {
-                        VerticalDivider()
+                    if (wide && showPanel) {
+                        ResizeHandle("resize-structure", { vm.layout(structureWidth = vm.workspace.value.structureWidth - it) })
                         ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                            { vm.editEntry(it) }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(300.dp).fillMaxHeight())
+                            { vm.editEntry(it, 1 - session.pane); vm.layout(split = true) }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(workspace.structureWidth.dp).fillMaxHeight())
                     }
                 }
             }
@@ -208,7 +205,8 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         if (jump) AlertDialog(onDismissRequest = { jump = false }, title = { Text(stringResource(R.string.jump_to_page)) }, text = { OutlinedTextField(pageInput, { pageInput = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.page_number)) }) },
             confirmButton = { TextButton(enabled = (pageInput.toIntOrNull() ?: 0) in 1..session.engine.pageCount, onClick = { go(pageInput.toInt() - 1); jump = false }) { Text(stringResource(R.string.go)) } }, dismissButton = { TextButton(onClick = { jump = false }) { Text(stringResource(R.string.cancel)) } })
         bookmark?.let { b -> BookmarkEditor(b, data, { bookmark = null }, { vm.saveBookmark(it) }) }
-        if (!wide) edited?.let { DraftEditor(it, data, vm) }
+
+        if (properties) DocumentEditor(data.documents.firstOrNull { it.id == session.document.id } ?: session.document, data, { properties = false }, vm::saveDocument)
         if (search) PdfSearchDialog(session, { search = false }, { anchor -> vm.open(session.document, anchor); search = false })
     }
 }
@@ -220,10 +218,10 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
     Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth().testTag("page-strip")) {
         Column(Modifier.padding(horizontal = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(enabled = page > 0, onClick = { onPage(page - 1) }) { Icon(Icons.Default.KeyboardArrowLeft, stringResource(R.string.previous_page)) }
+                IconButton(enabled = page > 0, onClick = { onPage(page - 1) }) { Icon(Outline.Left, stringResource(R.string.previous_page)) }
                 TextButton(onClick = onNumber, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.page, preview.roundToInt() + 1, count)) }
-                IconButton(enabled = page < count - 1, onClick = { onPage(page + 1) }) { Icon(Icons.Default.KeyboardArrowRight, stringResource(R.string.next_page)) }
-                IconButton(onClick = onClose) { Icon(Icons.Default.Close, stringResource(R.string.close)) }
+                IconButton(enabled = page < count - 1, onClick = { onPage(page + 1) }) { Icon(Outline.Right, stringResource(R.string.next_page)) }
+                IconButton(onClick = onClose) { Icon(Outline.Close, stringResource(R.string.close)) }
             }
             Slider(value = preview, onValueChange = { dragging = true; preview = it }, enabled = count > 1,
                 valueRange = 0f..(count - 1).coerceAtLeast(1).toFloat(), onValueChangeFinished = {
@@ -234,7 +232,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
 }
 
 @Composable private fun PdfPage(session: ReaderSession, index: Int, availableWidth: androidx.compose.ui.unit.Dp, availableHeight: androidx.compose.ui.unit.Dp, fitPage: Boolean,
-    highlights: List<Entry>, onSelection: (String, Anchor, PdfPageView) -> Unit, onHighlight: (Entry) -> Unit, onCenterTap: () -> Unit, onKey: (KeyEvent) -> Boolean) {
+    highlights: List<Entry>, onSelection: (String, Anchor, PdfPageView) -> Unit, onHighlight: (Entry) -> Unit, onCenterTap: () -> Unit, onKey: (KeyEvent) -> Boolean, onFocus: () -> Unit) {
     val density = LocalDensity.current
     val dimensions by produceState<Pair<Int, Int>?>(null, session.engine, index) {
         value = withContext(Dispatchers.IO) { runCatching { session.engine.dimensions(index) }.getOrNull() }
@@ -255,7 +253,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         catch (e: CancellationException) { throw e } catch (_: Exception) { /* The page remains readable without its text layer. */ }
     }
     Column(Modifier.width(pageWidth), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(stringResource(R.string.source_page, index + 1), style = MaterialTheme.typography.labelSmall, modifier = Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
         Box(Modifier.fillMaxWidth().aspectRatio(ratio).testTag("pdf-page-$index")) {
             val bitmap = image
             if (bitmap == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -265,8 +263,9 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                         TextButton(onClick = { retry++ }) { Text(stringResource(R.string.retry_page)) }
                     } else { CircularProgressIndicator(); Text(stringResource(R.string.loading_page)) }
                 }
-            } else key(MaterialTheme.colorScheme.surface) {
-                // Recreate the native canvas when the window theme changes; keep cached PDF data.
+            } else {
+                // PDF pixels do not depend on the chrome theme. Keep the live native canvas
+                // across theme changes so lazy-view release cannot clear the visible page.
                 AndroidView(factory = { context -> PdfPageView(context) },
                 onReset = { it.reset() }, onRelease = { it.reset() },
                 update = { view ->
@@ -274,6 +273,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                     view.onSelection = { quote, anchor -> onSelection(quote, anchor, view) }
                     view.onHighlight = onHighlight; view.onCenterTap = onCenterTap
                     view.onNavigationKey = onKey
+                    view.onPaneFocus = onFocus
                 }, modifier = Modifier.fillMaxSize().clipToBounds())
             }
             if (bitmap != null && text?.glyphs?.isEmpty() == true) Text(stringResource(R.string.no_text_layer),

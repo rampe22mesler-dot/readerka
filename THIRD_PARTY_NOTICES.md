@@ -17,3 +17,6 @@ Readerka использует опубликованные зависимост�
 Тексты Apache-2.0, PDFBox NOTICE и лицензии Bouncy Castle включены в APK в `assets/licenses/`. Лицензии Android SDK/JDK/Gradle относятся к инструментам сборки и не означают передачу прав на пользовательские PDF.
 
 Сетевые функции Bouncy Castle не используются; приложение не запрашивает INTERNET. Android lint отмечает trust-manager классы внутри транзитивного `bcpkix`, но Readerka не создаёт сетевых клиентов и не использует эти классы. Проверки HTTPS при настройке сборочной среды включены.
+
+- CommonMark Java 0.24.0, BSD 2-Clause: https://github.com/commonmark/commonmark-java. License included in app assets. The parser works offline; previews never change Markdown source.
+- Workspace outline glyphs are original Readerka artwork (same license as project source); no external icon font.

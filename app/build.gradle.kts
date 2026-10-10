@@ -9,11 +9,13 @@ android {
     namespace = "org.readerka"
     compileSdk = 35
     defaultConfig {
-        applicationId = "org.readerka"
+        val preview = providers.gradleProperty("readerkaPreview").orNull == "true"
+        applicationId = if (preview) "org.readerka.preview" else "org.readerka"
+        manifestPlaceholders["readerkaLabel"] = if (preview) "Readerka Preview" else "Readerka"
         minSdk = 28
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = if (preview) "0.6.0-preview" else "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
@@ -42,6 +44,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    implementation("org.commonmark:commonmark:0.24.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.00"))
     androidTestImplementation("androidx.test:runner:1.6.2")

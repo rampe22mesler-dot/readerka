@@ -14,6 +14,7 @@ import com.tom_roush.pdfbox.pdmodel.*
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -39,10 +40,15 @@ class ReadingWorkspaceUiTest {
         }
     }
     private fun page(number: Int) {
-        compose.waitUntil(30_000) { compose.onAllNodes(hasTestTag("reader-page-counter") and hasText("Страница $number из 4")).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            compose.waitUntil(30_000) { compose.onAllNodes(hasTestTag("reader-page-counter") and hasText("Страница $number из 4")).fetchSemanticsNodes().isNotEmpty() }
+        } catch (error: ComposeTimeoutException) {
+            throw AssertionError("Expected page $number; reader=${vm.reader.value?.let { "${it.document.id} page=${it.page} offset=${it.offset}" }}; panes=${vm.workspace.value.panes}; counters=${compose.onAllNodesWithTag("reader-page-counter").fetchSemanticsNodes().map { it.config }}", error)
+        }
     }
     private fun fixture(block: (List<Document>) -> Unit) {
         val suffix = UUID.randomUUID().toString()
+        val previous = runBlocking { WorkspaceStore(app).values.first() }
         val documents = (1..2).map { n -> Document("$suffix-$n", "Workspace $n $suffix", "workspace.pdf", "$suffix-$n.pdf", authors = "Author $n", pageCount = 4) }
         try {
             documents.forEach { document ->
@@ -59,6 +65,10 @@ class ReadingWorkspaceUiTest {
                 runBlocking { dao.putDocument(document) }
             }
             compose.waitUntil(30_000) { vm.library.value.documents.any { it.id == documents.last().id } }
+            compose.runOnUiThread {
+                vm.workspace.value.panes.forEachIndexed { pane, state -> state.tabs.toList().forEach { vm.closeTab(pane, it.id) } }
+                vm.layout(split = false, sidebarVisible = false); vm.focusPane(0)
+            }
             block(documents)
         } finally {
             compose.runOnUiThread { vm.closeEditor(); documents.forEach { vm.closeDocument(it.id) }; vm.navigate("library") }
@@ -70,6 +80,7 @@ class ReadingWorkspaceUiTest {
                     dao.deleteEntries(dao.allEntries().filter { it.documentId == document.id }.map { it.id })
                     dao.deleteDocument(document.id); File(app.filesDir, "pdfs/" + document.storedName).delete()
                 }
+                WorkspaceStore(app).save(previous)
             }
         }
     }

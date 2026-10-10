@@ -1,7 +1,10 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.readerka.data
 
 import androidx.room.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.math.min
@@ -33,7 +36,7 @@ data class Document(
     @PrimaryKey val id: String, val title: String, val originalName: String, val storedName: String,
     val folderId: String? = null, val authors: String = "", val year: String = "", val publisher: String = "",
     val doi: String = "", val url: String = "", val description: String = "",
-    val createdAt: Long = System.currentTimeMillis(), val lastOpenedAt: Long = 0,
+    @EncodeDefault val createdAt: Long = System.currentTimeMillis(), val lastOpenedAt: Long = 0,
     val lastPage: Int = 0, val lastOffset: Int = 0, val pageCount: Int = 0
 )
 
@@ -43,7 +46,7 @@ data class Document(
 data class Entry(
     @PrimaryKey val id: String, val title: String, val quote: String = "", val comment: String = "",
     val documentId: String? = null, val anchor: Anchor? = null, val type: NoteType = NoteType.GeneralNote,
-    val color: Marker = Marker.Yellow, val createdAt: Long = System.currentTimeMillis(), val updatedAt: Long = createdAt
+    val color: Marker = Marker.Yellow, @EncodeDefault val createdAt: Long = System.currentTimeMillis(), @EncodeDefault val updatedAt: Long = createdAt
 )
 
 @Serializable
