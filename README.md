@@ -6,11 +6,11 @@
 
 ## Рабочее пространство 0.6.0 — Preview
 
-[Скачать Readerka 0.6.0 Preview — APK](https://github.com/rampe22mesler-dot/readerka/raw/refs/heads/main/downloads/readerka-0.6.0-preview.apk) · [SHA-256](downloads/SHA256SUMS.txt)
+[Скачать Readerka 0.6.0 Preview — APK](https://raw.githubusercontent.com/rampe22mesler-dot/readerka/main/downloads/readerka-0.6.0-preview.apk) · [SHA-256](downloads/SHA256SUMS.txt)
 
 **Это отдельное приложение Readerka Preview (`org.readerka.preview`), которое устанавливается рядом с Readerka 0.5.0. Оно не обновляет и не удаляет прежнюю библиотеку.** Прежний ключ подписи 0.5.0 в этой среде отсутствует: сертификаты отличаются. Совместимое обновление `org.readerka` пока не выпускается. Не удаляйте прежнее приложение ради Preview.
 
-На Huawei MatePad откройте ссылку в браузере и установите APK обычным способом. Для переноса существующей библиотеки сначала сохраните нужные черновики в старом Readerka, затем создайте резервный ZIP в настройках и восстановите его в Preview. У приложений отдельные хранилища; закрытые черновики не входят в резервный ZIP. [Readerka 0.5.0 с прежней подписью](https://github.com/rampe22mesler-dot/readerka/raw/refs/heads/main/downloads/readerka-0.5.0-debug.apk) остаётся доступна.
+На Huawei MatePad откройте ссылку в браузере и установите APK обычным способом. Для переноса существующей библиотеки сначала сохраните нужные черновики в старом Readerka, затем создайте резервный ZIP в настройках и восстановите его в Preview. У приложений отдельные хранилища; закрытые черновики не входят в резервный ZIP. [Readerka 0.5.0 с прежней подписью](https://raw.githubusercontent.com/rampe22mesler-dot/readerka/main/downloads/readerka-0.5.0-debug.apk) остаётся доступна.
 
 ### Что изменилось
 

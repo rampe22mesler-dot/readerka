@@ -41,6 +41,8 @@
 
 `apksigner verify --verbose --print-certs` подтверждает подпись v2, одного подписанта и сертификат Preview SHA-256 `5b8ed068c6ad5a5377f6e19f613f0d943b597c98a99cf895d93de651df450dd7`. `aapt dump badging` подтверждает applicationId, versionCode 6, minSdk 28, targetSdk 35 и запуск `org.readerka.MainActivity`. SHA-256 APK: `c31db562075be734c7798fa471b023d4f24764291c836415df1cd206df6d2bca`.
 
+После публикации в `main` APK повторно скачан по [прямому адресу](https://raw.githubusercontent.com/rampe22mesler-dot/readerka/main/downloads/readerka-0.6.0-preview.apk). `cmp` подтвердил полное совпадение с локальным APK; SHA-256, сертификат и applicationId/versionCode/minSdk/targetSdk повторно проверены на скачанном файле. Маршрут `github.com/.../raw/refs/heads/main/...` вернул 404 в этой среде, поэтому README использует проверенный `raw.githubusercontent.com`.
+
 ## Проверки на MatePad
 
 На физическом устройстве остаются проверки HarmonyOS 4.2, его экранной клавиатуры в портретном/альбомном и разделённом окне, M-Pencil, реальных тяжёлых/многоколоночных PDF и ответа Google Переводчика. Два движка PDF держат два независимых контекста, страницы рисуются лениво; производительность тяжёлых сканов на MatePad не измерялась. Markdown-просмотр поддерживает запрошенные конструкции, но изображения пока обозначаются текстом, а HTML остаётся буквальным текстом.
