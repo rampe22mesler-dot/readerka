@@ -75,7 +75,10 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
                 _draftStatus.value = "Черновик сохранён"
                 workspaceReady.complete(Unit)
                 val data = repository.snapshots.first()
-                // Additive migration: old drafts/history remain intact; Room/backup schemas stay at 2.
+                // Map old outline draft memberships to their independent folders before autosaving.
+                _workspace.value = _workspace.value.copy(drafts = _workspace.value.drafts.map { draft ->
+                    draft.copy(collections = scopedCollectionIds(draft.collections, draft.entry.kind, data.collections))
+                })
                 if (_workspace.value.panes.all { it.tabs.isEmpty() }) {
                     val state = _workspace.value
                     val doc = data.documents.firstOrNull { it.id == (savedState.get<String>("document") ?: state.history.current?.documentId) }
@@ -130,8 +133,9 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     fun convertToConsp(entry: Entry) = perform {
         val data = repository.dao.snapshot()
         val next = entry.copy(kind = EntryKind.Consp, sources = (entry.sources + listOfNotNull(entry.documentId)).distinct(), documentId = if (entry.anchor == null) null else entry.documentId)
-        repository.saveEntry(next, data.entryTags.filter { it.entryId == entry.id }.mapNotNull { link -> data.tags.firstOrNull { it.id == link.tagId }?.name }.joinToString(", "), data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet(), if (next.documentId == null) emptySet() else null)
-        _workspace.value.drafts.firstOrNull { it.entry.id == entry.id }?.let { updateDraft(it.copy(entry = next, readerFolders = if (next.documentId == null) emptySet() else it.readerFolders)) }
+        val collections = if (entry.kind == EntryKind.Consp) data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet() else repository.foldersForConversion(data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet())
+        repository.saveEntry(next, data.entryTags.filter { it.entryId == entry.id }.mapNotNull { link -> data.tags.firstOrNull { it.id == link.tagId }?.name }.joinToString(", "), collections, if (next.documentId == null) emptySet() else null)
+        _workspace.value.drafts.firstOrNull { it.entry.id == entry.id }?.let { updateDraft(it.copy(entry = next, collections = collections, readerFolders = if (next.documentId == null) emptySet() else it.readerFolders)) }
         openNote(next)
     }
     private val editorHistories = mutableMapOf<String, EditorHistory>()

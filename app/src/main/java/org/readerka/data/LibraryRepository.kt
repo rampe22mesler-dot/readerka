@@ -43,6 +43,8 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
         } catch (e: Exception) { pending.delete(); file.delete(); throw e }
     }
     suspend fun saveEntry(entry: Entry, tagNames: String, collectionIds: Set<String>, readerFolderIds: Set<String>? = null) = database.withTransaction {
+        val folders = dao.allCollections()
+        require(collectionIds.all { id -> folders.any { it.id == id && it.scope == entry.kind.collectionScope() } }) { "Folder belongs to another catalogue" }
         if (readerFolderIds != null) {
             val folders = dao.allReaderFolders().associateBy { it.id }
             require(readerFolderIds.all { folders[it]?.let { f -> f.documentId == entry.documentId && f.kind == ReaderFolderKind.Quotes } == true })
@@ -102,6 +104,10 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
         }
     }
     suspend fun batch(ids: Set<String>, color: Marker? = null, type: NoteType? = null, tags: String? = null, collection: String? = null) = database.withTransaction {
+        if (collection != null) {
+            val folder = dao.allCollections().first { it.id == collection }
+            require(dao.allEntries().filter { it.id in ids }.all { it.kind.collectionScope() == folder.scope })
+        }
         for (e in dao.allEntries().filter { it.id in ids }) {
             if (color != null || type != null) dao.putEntry(e.copy(color = color ?: e.color, type = type ?: e.type, updatedAt = System.currentTimeMillis()))
             if (collection != null) dao.putMembership(Membership(collection, e.id))
@@ -113,8 +119,21 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
         FolderTree.validate(values.map { it.id to it.parentId }); require(folder.name.isNotBlank()); dao.putFolder(folder)
     }
     suspend fun saveCollection(collection: Collection) = database.withTransaction {
-        val values = dao.allCollections().filterNot { it.id == collection.id } + collection
+        val all = dao.allCollections()
+        require(all.none { it.id == collection.id && it.scope != collection.scope })
+        val values = all.filterNot { it.id == collection.id } + collection
+        require(collection.parentId == null || values.any { it.id == collection.parentId && it.scope == collection.scope })
         FolderTree.validate(values.map { it.id to it.parentId }); require(collection.name.isNotBlank()); dao.putCollection(collection)
+    }
+    suspend fun foldersForConversion(ids: Set<String>): Set<String> = database.withTransaction {
+        val all = dao.allCollections()
+        val notes = all.filter { it.scope == CollectionScope.Notes }
+        val needed = ids + FolderTree.ancestors(ids, notes.map { it.id to it.parentId })
+        for (folder in FolderTree.ordered(notes.filter { it.id in needed }, { it.id }, { it.parentId })) {
+            val id = legacyConspFolderId(folder.id)
+            if (all.none { it.id == id }) dao.putCollection(folder.copy(id = id, parentId = folder.parentId?.let(::legacyConspFolderId), scope = CollectionScope.Consp))
+        }
+        ids.map(::legacyConspFolderId).toSet()
     }
     suspend fun renameTag(id: String, name: String) = database.withTransaction {
         val normalized = name.trim().removePrefix("#")

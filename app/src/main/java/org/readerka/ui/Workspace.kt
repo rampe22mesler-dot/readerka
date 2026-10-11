@@ -58,12 +58,13 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
     } }
 }
 
-@Composable fun WorkspaceSidebar(data: LibrarySnapshot, active: String?, vm: LibraryViewModel, onImport: (String?) -> Unit, onOpened: () -> Unit, modifier: Modifier = Modifier, notes: Boolean = false, selectedCollection: String? = null, onCollection: (String?) -> Unit = {}, consp: Boolean = false) {
+@Composable fun WorkspaceSidebar(data: LibrarySnapshot, active: String?, vm: LibraryViewModel, onImport: (String?) -> Unit, onOpened: () -> Unit, modifier: Modifier = Modifier, notes: Boolean = false, selectedFolders: Map<String, String?> = emptyMap(), onFolder: (String, String?) -> Unit = { _, _ -> }, consp: Boolean = false) {
     var mode by rememberSaveable { mutableStateOf(if (consp) "consp" else if (notes) "notes" else "pdf") }
     var creatingConsp by remember { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
     var expanded by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
-    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    val selected = selectedFolders[mode]
+    fun selectFolder(id: String?) { onFolder(mode, id) }
     var editor by remember { mutableStateOf(false) }
     var edited by remember { mutableStateOf<FolderItem?>(null) }
     var parent by remember { mutableStateOf<String?>(null) }
@@ -71,7 +72,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
     var assigning by remember { mutableStateOf<Entry?>(null) }
     var rename by remember { mutableStateOf<String?>(null) }
     var renameText by remember { mutableStateOf("") }
-    val folders = if (mode == "pdf") data.documentFolders.map { FolderItem(it.id, it.name, it.parentId) } else data.collections.map { FolderItem(it.id, it.name, it.parentId) }
+    val folders = if (mode == "pdf") data.documentFolders.map { FolderItem(it.id, it.name, it.parentId) } else data.collectionsFor(if (mode == "consp") EntryKind.Consp else EntryKind.Note).map { FolderItem(it.id, it.name, it.parentId) }
     LaunchedEffect(notes, consp) { if (consp) mode = "consp" else if (notes) mode = "notes" }
     LaunchedEffect(active, data.documentFolders) {
         val folder = data.documents.firstOrNull { it.id == active }?.folderId
@@ -87,7 +88,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
             if (row.document != null && mode == "pdf") vm.saveDocument(row.document.copy(folderId = folder), data.documentTags.filter { it.documentId == row.document.id }.mapNotNull { l -> data.tags.firstOrNull { it.id == l.tagId }?.name }.joinToString(", "))
             if (row.entry != null && mode != "pdf" && folder != null) vm.batch(setOf(row.entry.id), collection = folder)
             if (row.folder != null && row.folder.id != folder && runCatching { FolderTree.validate(folders.map { it.id to if (it.id == row.folder.id) folder else it.parentId }) }.isSuccess) {
-                if (mode == "pdf") vm.folder(DocumentFolder(row.folder.id, row.folder.name, folder)) else vm.collection(org.readerka.data.Collection(row.folder.id, row.folder.name, folder))
+                if (mode == "pdf") vm.folder(DocumentFolder(row.folder.id, row.folder.name, folder)) else vm.collection(org.readerka.data.Collection(row.folder.id, row.folder.name, folder, if (mode == "consp") CollectionScope.Consp else CollectionScope.Notes))
             }
         }
         dragging = false; payload = null
@@ -113,13 +114,13 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                 WorkspaceAction(Outline.Folder, "Создать папку", { parent = null; edited = null; editor = true })
             }
             Row(Modifier.fillMaxWidth()) {
-                TextButton(onClick = { mode = "pdf"; selected = null }, modifier = Modifier.weight(1f)) { Text("PDF", color = if (mode == "pdf") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
-                TextButton(onClick = { mode = "consp"; selected = selectedCollection }, modifier = Modifier.weight(1f)) { Text("Конспекты", color = if (mode == "consp") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
-                TextButton(onClick = { mode = "notes"; selected = selectedCollection }, modifier = Modifier.weight(1f)) { Text("Заметки", color = if (mode == "notes") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+                TextButton(onClick = { mode = "pdf"; vm.navigate("library") }, modifier = Modifier.weight(1f)) { Text("PDF", color = if (mode == "pdf") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+                TextButton(onClick = { mode = "consp"; vm.navigate("consp") }, modifier = Modifier.weight(1f)) { Text("Конспекты", color = if (mode == "consp") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+                TextButton(onClick = { mode = "notes"; vm.navigate("notes") }, modifier = Modifier.weight(1f)) { Text("Заметки", color = if (mode == "notes") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            Text(if (mode == "pdf") "Папки библиотеки PDF" else "Общие папки · ссылки на записи", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(if (mode == "pdf") "Папки библиотеки PDF" else if (mode == "consp") "Отдельные папки конспектов" else "Папки заметок и цитат", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp))
             OutlinedTextField(search, { search = it }, singleLine = true, placeholder = { Text("Поиск в проводнике") }, modifier = Modifier.fillMaxWidth().padding(8.dp), leadingIcon = { Icon(Outline.Search, null, Modifier.size(18.dp)) })
-            TextButton(onClick = { selected = null; if (mode == "pdf") vm.navigate("library") else { onCollection(null); vm.navigate(if (mode == "consp") "consp" else "notes") }; onOpened() }, modifier = Modifier.fillMaxWidth().onGloballyPositioned { targets[null] = it.boundsInRoot() }) { Text(if (mode == "pdf") "Все документы" else if (mode == "consp") "Все конспекты" else "Все заметки") }
+            TextButton(onClick = { selectFolder(null); vm.navigate(if (mode == "pdf") "library" else mode); onOpened() }, modifier = Modifier.fillMaxWidth().onGloballyPositioned { targets[null] = it.boundsInRoot() }) { Text(if (mode == "pdf") "Библиотека PDF" else if (mode == "consp") "Папки конспектов" else "Папки заметок и цитат") }
             HorizontalDivider()
             LazyColumn(Modifier.weight(1f)) {
                 if (rows.isEmpty()) item { Text("Пока пусто", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp)) }
@@ -136,17 +137,18 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                         .mouseDrag({ payload = row; dragging = true }, { dropPoint = origin + it }, ::drop, { dragging = false; payload = null })
                         .combinedClickable(onClick = {
                             when {
-                                row.folder != null -> { selected = row.folder.id; expanded = if (row.folder.id in expanded) expanded - row.folder.id else expanded + row.folder.id }
+                                row.folder != null -> { selectFolder(row.folder.id); expanded = (expanded + row.folder.id).distinct(); vm.navigate(if (mode == "pdf") "library" else mode); onOpened() }
                                 row.document != null -> { vm.open(row.document); onOpened() }
                                 row.entry != null -> { vm.openNote(row.entry); onOpened() }
                             }
                         }, onLongClick = { menu = true })
                         .padding(start = (8 + row.depth * 12).coerceAtMost(68).dp).testTag("explorer-${row.id}"), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (row.folder != null) { if (row.folder.id in expanded) Outline.Down else Outline.Right } else if (row.document != null) Outline.File else Outline.Note, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (row.folder != null) IconButton(onClick = { expanded = if (row.folder.id in expanded) expanded - row.folder.id else expanded + row.folder.id }, modifier = Modifier.size(48.dp).testTag("explorer-expand-${row.folder.id}")) { Icon(if (row.folder.id in expanded) Outline.Down else Outline.Right, if (row.folder.id in expanded) "Свернуть папку" else "Развернуть папку", Modifier.size(18.dp)) }
+                        else Icon(if (row.document != null) Outline.File else Outline.Note, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (rename == row.folder?.id && rename != null) {
                             BasicTextField(renameText, { renameText = it }, singleLine = true, textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(6.dp).testTag("rename-folder"))
                             WorkspaceAction(Outline.Save, "Сохранить имя", {
-                                row.folder?.let { f -> if (renameText.isNotBlank()) { if (mode == "pdf") vm.folder(DocumentFolder(f.id, renameText.trim(), f.parentId)) else vm.collection(org.readerka.data.Collection(f.id, renameText.trim(), f.parentId)); rename = null } }
+                                row.folder?.let { f -> if (renameText.isNotBlank()) { if (mode == "pdf") vm.folder(DocumentFolder(f.id, renameText.trim(), f.parentId)) else vm.collection(org.readerka.data.Collection(f.id, renameText.trim(), f.parentId, if (mode == "consp") CollectionScope.Consp else CollectionScope.Notes)); rename = null } }
                             })
                         } else Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 6.dp))
                         Box {
@@ -154,7 +156,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                             DropdownMenu(menu, { menu = false }) {
                                 row.folder?.let { f ->
                                     DropdownMenuItem(text = { Text("Создать подпапку") }, onClick = { menu = false; parent = f.id; edited = null; editor = true; expanded = (expanded + f.id).distinct() })
-                                    if (mode == "consp") DropdownMenuItem(text = { Text("Создать конспект здесь") }, onClick = { menu = false; selected = f.id; creatingConsp = true })
+                                    if (mode == "consp") DropdownMenuItem(text = { Text("Создать конспект здесь") }, onClick = { menu = false; selectFolder(f.id); creatingConsp = true })
                                     if (mode == "notes") DropdownMenuItem(text = { Text("Создать заметку здесь") }, onClick = { menu = false; vm.newNote(collection = f.id); onOpened() })
                                     DropdownMenuItem(text = { Text("Переименовать на месте") }, onClick = { menu = false; rename = f.id; renameText = f.name })
                                     DropdownMenuItem(text = { Text("Переместить / удалить папку") }, onClick = { menu = false; edited = f; parent = f.parentId; editor = true })
@@ -180,9 +182,9 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
         }
     }
     if (creatingConsp) CreateConspDialog(data, null, selected, vm) { creatingConsp = false; onOpened() }
-    if (editor) FolderEditor(edited, folders, parent, { editor = false }, { f -> if (mode == "pdf") vm.folder(DocumentFolder(f.id, f.name, f.parentId)) else vm.collection(org.readerka.data.Collection(f.id, f.name, f.parentId)) }, { vm.deleteFolder(it, mode != "pdf") })
+    if (editor) FolderEditor(edited, folders, parent, { editor = false }, { f -> if (mode == "pdf") vm.folder(DocumentFolder(f.id, f.name, f.parentId)) else vm.collection(org.readerka.data.Collection(f.id, f.name, f.parentId, if (mode == "consp") CollectionScope.Consp else CollectionScope.Notes)) }, { vm.deleteFolder(it, mode != "pdf") })
     movingPdf?.let { d -> AlertDialog(onDismissRequest = { movingPdf = null }, title = { Text("Переместить PDF") }, text = { FolderBrowser(data.documentFolders.map { FolderItem(it.id, it.name, it.parentId) }, d.folderId, { folder -> vm.saveDocument(d.copy(folderId = folder), data.documentTags.filter { it.documentId == d.id }.mapNotNull { l -> data.tags.firstOrNull { it.id == l.tagId }?.name }.joinToString(", ")); movingPdf = null }, Modifier.heightIn(max = 420.dp).fillMaxWidth(), "Корень библиотеки") }, confirmButton = { TextButton(onClick = { movingPdf = null }) { Text("Отмена") } }) }
-    assigning?.let { e -> AlertDialog(onDismissRequest = { assigning = null }, title = { Text("Добавить в общие папки") }, text = { FolderMembershipChoice("Выбрать папки", data.collections.map { FolderItem(it.id, it.name, it.parentId) }, data.memberships.filter { it.entryId == e.id }.map { it.collectionId }.toSet(), { ids -> ids.forEach { vm.batch(setOf(e.id), collection = it) }; assigning = null }) }, confirmButton = { TextButton(onClick = { assigning = null }) { Text("Закрыть") } }) }
+    assigning?.let { e -> AlertDialog(onDismissRequest = { assigning = null }, title = { Text(if (e.kind == EntryKind.Consp) "Добавить в папки конспектов" else "Добавить в папки заметок и цитат") }, text = { FolderMembershipChoice("Выбрать папки", data.collectionsFor(e.kind).map { FolderItem(it.id, it.name, it.parentId) }, data.memberships.filter { it.entryId == e.id }.map { it.collectionId }.toSet(), { ids -> ids.forEach { vm.batch(setOf(e.id), collection = it) }; assigning = null }) }, confirmButton = { TextButton(onClick = { assigning = null }) { Text("Закрыть") } }) }
 }
 
 @Composable fun WorkspaceTabs(model: WorkspacePane, pane: Int, data: LibrarySnapshot, drafts: List<EntryDraft>, activePane: Boolean, vm: LibraryViewModel) {

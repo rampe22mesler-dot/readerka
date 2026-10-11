@@ -9,7 +9,7 @@ import java.security.MessageDigest
 import java.util.zip.*
 
 @Serializable
-data class BackupManifest(val version: Int = 3, val sha256: Map<String, String>)
+data class BackupManifest(val version: Int = 4, val sha256: Map<String, String>)
 data class StagedBackup(val data: LibrarySnapshot, val directory: File)
 
 object BackupArchive {
@@ -26,7 +26,7 @@ object BackupArchive {
         for (d in data.documents) { val file = pdf(d); require(file.isFile) { "Missing PDF: ${d.originalName}" }; hashes["pdfs/${d.storedName}"] = digest(file) }
         ZipOutputStream(output.buffered()).use { zip ->
             fun put(path: String, write: () -> Unit) { zip.putNextEntry(ZipEntry(path)); write(); zip.closeEntry() }
-            put("manifest.json") { zip.write(json.encodeToString(BackupManifest(sha256 = hashes)).toByteArray()) }
+            put("manifest.json") { zip.write(json.encodeToString(BackupManifest(version = data.version, sha256 = hashes)).toByteArray()) }
             put("library.json") { zip.write(bytes) }
             for (d in data.documents) put("pdfs/${d.storedName}") { pdf(d).inputStream().use { it.copyTo(zip) } }
         }
@@ -54,17 +54,23 @@ object BackupArchive {
                 }
             }
             val manifest = json.decodeFromString<BackupManifest>(File(directory, "manifest.json").readText())
-            require(manifest.version in 1..3) { "Unsupported backup version" }
+            require(manifest.version in 1..4) { "Unsupported backup version" }
             require(seen == manifest.sha256.keys + "manifest.json") { "Incomplete backup" }
             for ((name, hash) in manifest.sha256) require(digest(File(directory, name)) == hash) { "Checksum mismatch" }
             val data = json.decodeFromString<LibrarySnapshot>(File(directory, "library.json").readText())
             validate(data)
             require(manifest.sha256.keys == data.documents.map { "pdfs/${it.storedName}" }.toSet() + "library.json") { "PDF manifest mismatch" }
-            return StagedBackup(data, directory)
+            var separated = data.separateLegacyCollections()
+            if (data.version < 4) separated = separated.copy(noteVersions = data.noteVersions.map { v ->
+                val draft = json.decodeFromString<EntryDraft>(v.snapshot)
+                v.copy(snapshot = json.encodeToString(draft.copy(collections = scopedCollectionIds(draft.collections, draft.entry.kind, separated.collections))))
+            })
+            validate(separated)
+            return StagedBackup(separated, directory)
         } catch (e: Exception) { directory.deleteRecursively(); throw e }
     }
     fun validate(s: LibrarySnapshot) {
-        require(s.version in 1..3)
+        require(s.version in 1..4)
         fun ids(values: List<String>): Set<String> { require(values.all { it.isNotBlank() } && values.distinct().size == values.size); return values.toSet() }
         val docIds = ids(s.documents.map { it.id }); val entryIds = ids(s.entries.map { it.id })
         val collectionIds = ids(s.collections.map { it.id }); val folderIds = ids(s.documentFolders.map { it.id }); val tagIds = ids(s.tags.map { it.id })
@@ -74,6 +80,12 @@ object BackupArchive {
         require(s.documents.map { it.storedName }.distinct().size == s.documents.size)
         require(s.tags.map { it.name }.distinct().size == s.tags.size)
         FolderTree.validate(s.documentFolders.map { it.id to it.parentId }); FolderTree.validate(s.collections.map { it.id to it.parentId })
+        if (s.version >= 4) {
+            val folders = s.collections.associateBy { it.id }
+            val entries = s.entries.associateBy { it.id }
+            s.collections.forEach { c -> require(c.parentId == null || folders[c.parentId]?.scope == c.scope) }
+            s.memberships.forEach { m -> require(folders[m.collectionId]?.scope == entries[m.entryId]?.kind?.collectionScope()) }
+        }
         s.documents.forEach { require(it.storedName.matches(Regex("[A-Za-z0-9_-]+\\.pdf")) && (it.folderId == null || it.folderId in folderIds) && it.lastPage >= 0 && it.pageCount >= 0) }
         s.entries.forEach { e ->
             require(e.documentId == null || e.documentId in docIds)

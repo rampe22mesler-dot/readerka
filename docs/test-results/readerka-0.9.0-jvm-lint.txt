@@ -1,0 +1,23 @@
+Readerka 0.9.0 Preview — based on 0.7.0
+Date: 2026-10-11 UTC
+
+{'tests': 45, 'failures': 0, 'errors': 0, 'skipped': 0}
+org.readerka.BackupArchiveTest: tests=3, failures=0, errors=0, skipped=0
+org.readerka.CollectionStructureTest: tests=5, failures=0, errors=0, skipped=0
+org.readerka.ConspModelTest: tests=14, failures=0, errors=0, skipped=0
+org.readerka.FolderBrowserTest: tests=2, failures=0, errors=0, skipped=0
+org.readerka.NoteQueryTest: tests=4, failures=0, errors=0, skipped=0
+org.readerka.ReaderStructureTest: tests=3, failures=0, errors=0, skipped=0
+org.readerka.VaultExporterTest: tests=3, failures=0, errors=0, skipped=0
+org.readerka.WordSelectionTest: tests=3, failures=0, errors=0, skipped=0
+org.readerka.WorkspaceLayoutTest: tests=5, failures=0, errors=0, skipped=0
+org.readerka.WorkspaceStateTest: tests=3, failures=0, errors=0, skipped=0
+
+Lint: Counter({'Warning': 31})
+DataExtractionRules: 1
+MonochromeLauncherIcon: 1
+ObsoleteSdkInt: 1
+SetJavaScriptEnabled: 1
+TrustAllX509TrustManager: 3
+UnusedResources: 21
+UseKtx: 3

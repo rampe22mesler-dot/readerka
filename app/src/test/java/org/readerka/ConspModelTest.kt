@@ -77,7 +77,7 @@ class ConspModelTest {
             val pdf = File(temp, "a.pdf").apply { writeText("%PDF fixture") }
             val entry = Entry("n", "Конспект", kind = EntryKind.Consp, sources = listOf("a")).withContent(RichText.fromMarkdown("# Вопрос\n\n**Мысль**"))
             val version = NoteVersion("v", "n", Json.encodeToString(EntryDraft(entry, "tag", setOf("c"))), 123, "До вставки")
-            val data = LibrarySnapshot(documents = listOf(Document("a", "A", "a.pdf", "a.pdf")), entries = listOf(entry), collections = listOf(Collection("c", "Тема")), memberships = listOf(Membership("c", "n")), noteVersions = listOf(version))
+            val data = LibrarySnapshot(documents = listOf(Document("a", "A", "a.pdf", "a.pdf")), entries = listOf(entry), collections = listOf(Collection("c", "Тема", scope = CollectionScope.Consp)), memberships = listOf(Membership("c", "n")), noteVersions = listOf(version))
             val bytes = ByteArrayOutputStream(); BackupArchive.write(bytes, data) { pdf }
             assertEquals(data, BackupArchive.stage(bytes.toByteArray().inputStream(), File(temp, "restore")).data)
         } finally { temp.deleteRecursively() }

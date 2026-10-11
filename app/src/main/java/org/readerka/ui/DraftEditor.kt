@@ -234,7 +234,7 @@ import org.readerka.data.TextStyle
                     }
                     ColorPalette(entry.color) { vm.updateDraft(draft.copy(entry = entry.copy(color = it))) }
                     OutlinedTextField(draft.tags, { vm.updateDraft(draft.copy(tags = it)) }, enabled = !saving, label = { Text(stringResource(R.string.tags)) }, modifier = Modifier.fillMaxWidth().focusRequester(tagsFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "tags") }.testTag("entry-tags"))
-                    FolderMembershipChoice("Темы / общие папки", data.collections.map { FolderItem(it.id, it.name, it.parentId) }, draft.collections, { vm.updateDraft(draft.copy(collections = it)) }, Modifier.testTag("entry-collections"))
+                    FolderMembershipChoice(if (draft.entry.kind == EntryKind.Consp) "Папки конспектов" else "Папки заметок и цитат", data.collectionsFor(draft.entry.kind).map { FolderItem(it.id, it.name, it.parentId) }, draft.collections, { vm.updateDraft(draft.copy(collections = it)) }, Modifier.testTag("entry-collections"))
                     if (entry.kind == EntryKind.Quote && entry.documentId != null) FolderMembershipChoice("Папки цитат внутри PDF", data.readerFolders.filter { it.documentId == entry.documentId && it.kind == ReaderFolderKind.Quotes }.map { FolderItem(it.id, it.name, it.parentId) }, draft.readerFolders, { vm.updateDraft(draft.copy(readerFolders = it)) }, Modifier.testTag("entry-reader-folders"))
                     TextButton(onClick = { history = true }) { Text("История изменений") }
                     TextButton(onClick = { vm.checkpointDraft(entry.id, "Версия пользователя") }) { Text("Сохранить контрольную версию") }

@@ -5,6 +5,8 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 @Dao
 abstract class LibraryDao {
@@ -64,7 +66,7 @@ abstract class LibraryDao {
     )
 }
 
-@Database(entities = [Document::class, DocumentFolder::class, Entry::class, Collection::class, Membership::class, Tag::class, EntryTag::class, DocumentTag::class, Bookmark::class, ReaderFolder::class, ReaderMembership::class, NoteVersion::class], version = 3, exportSchema = true)
+@Database(entities = [Document::class, DocumentFolder::class, Entry::class, Collection::class, Membership::class, Tag::class, EntryTag::class, DocumentTag::class, Bookmark::class, ReaderFolder::class, ReaderMembership::class, NoteVersion::class], version = 4, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
@@ -95,6 +97,28 @@ abstract class LibraryDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_note_versions_entryId ON note_versions(entryId)")
             }
         }
-        fun open(context: Context, name: String = "readerka.db") = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE collections ADD COLUMN scope TEXT NOT NULL DEFAULT 'Notes'")
+                val old = buildList {
+                    db.query("SELECT id,name,parentId FROM collections").use { c -> while (c.moveToNext()) add(Collection(c.getString(0), c.getString(1), if (c.isNull(2)) null else c.getString(2))) }
+                }
+                for (folder in FolderTree.ordered(old, { it.id }, { it.parentId })) {
+                    val id = legacyConspFolderId(folder.id)
+                    db.execSQL("INSERT INTO collections(id,name,parentId,scope) VALUES(?,?,?,'Consp')", arrayOf(id, folder.name, folder.parentId?.let(::legacyConspFolderId)))
+                    db.execSQL("INSERT INTO memberships(collectionId,entryId) SELECT ?,m.entryId FROM memberships m JOIN entries e ON e.id=m.entryId WHERE m.collectionId=? AND e.kind='Consp'", arrayOf(id, folder.id))
+                }
+                db.execSQL("DELETE FROM memberships WHERE collectionId IN (SELECT id FROM collections WHERE scope='Notes') AND entryId IN (SELECT id FROM entries WHERE kind='Consp')")
+                val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+                val versions = buildList {
+                    db.query("SELECT id,snapshot FROM note_versions").use { c -> while (c.moveToNext()) add(c.getString(0) to c.getString(1)) }
+                }
+                for ((id, snapshot) in versions) {
+                    val draft = json.decodeFromString<EntryDraft>(snapshot)
+                    if (draft.entry.kind == EntryKind.Consp) db.execSQL("UPDATE note_versions SET snapshot=? WHERE id=?", arrayOf(json.encodeToString(draft.copy(collections = draft.collections.map(::legacyConspFolderId).toSet())), id))
+                }
+            }
+        }
+        fun open(context: Context, name: String = "readerka.db") = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 }

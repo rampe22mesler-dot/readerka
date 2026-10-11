@@ -1,0 +1,21 @@
+e59a4c07fdfb2a758aeeaacfc58ad574a8cd35841c56dadbfb62152e939a2e9d  downloads/readerka-0.9.0-preview.apk
+package: name='org.readerka.preview' versionCode='9' versionName='0.9.0-preview' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+sdkVersion:'28'
+targetSdkVersion:'35'
+application-label:'Readerka Preview'
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Number of signers: 1
+Signer #1 certificate SHA-256 digest: 5b8ed068c6ad5a5377f6e19f613f0d943b597c98a99cf895d93de651df450dd7
+Signer #1 public key SHA-256 digest: 87a666f7c7f325336dc0aa4199fb51e4f4718e8abb692bab027375326de46a87
+    userId=10089
+    versionCode=9 minSdk=28 targetSdk=35
+    versionName=0.9.0-preview
+
+Database user_version: 4
+Retained upgrade fixture: ('upgrade-060-fixture', 'Existing Preview note', 'Retained text', 'Summary', 'Green', 'Note')
+Foreign key violations: []

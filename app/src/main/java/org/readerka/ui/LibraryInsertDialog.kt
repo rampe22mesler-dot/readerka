@@ -47,8 +47,8 @@ enum class InsertMode(val label: String) { Inline("Ссылка на текст"
             Choice("Способ", mode, InsertMode.entries, { it.label }, { mode = it })
             OutlinedTextField(search, { search = it }, label = { Text("Поиск записей") }, modifier = Modifier.testTag("insert-search"))
             if (current.sourceBooks().isNotEmpty()) Row { Checkbox(scope, { scope = it }, modifier = Modifier.testTag("insert-related-scope")); Text("Материалы связанных книг") }
-            Choice("Тип", kind, listOf(null) + EntryKind.entries, { when (it) { EntryKind.Quote -> "Цитата"; EntryKind.Note -> "Заметка"; EntryKind.Consp -> "Конспект"; null -> "Все" } }, { kind = it })
-            FolderChoice("Тема / папка", folder, data.collections.map { FolderItem(it.id, it.name, it.parentId) }, "Все темы", { folder = it })
+            Choice("Тип", kind, listOf(null) + EntryKind.entries, { when (it) { EntryKind.Quote -> "Цитата"; EntryKind.Note -> "Заметка"; EntryKind.Consp -> "Конспект"; null -> "Все" } }, { kind = it; folder = null })
+            FolderChoice("Тема / папка", folder, data.collections.filter { kind == null || it.scope == kind!!.collectionScope() }.map { FolderItem(it.id, (if (it.parentId == null) (if (it.scope == CollectionScope.Consp) "Конспекты · " else "Заметки и цитаты · ") else "") + it.name, it.parentId) }, "Все темы", { folder = it })
             SearchChoice("Тег", tag, data.tags.map { SearchOption(it.id, it.name) }, "Поиск тегов", { tag = it })
             SearchChoice("Книга", book, data.documents.map { SearchOption(it.id, it.title) }, "Поиск книг", { book = it })
             Column {

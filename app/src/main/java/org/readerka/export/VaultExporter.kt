@@ -40,7 +40,7 @@ class VaultExporter {
         }
         val folders = data.documentFolders.associate { it.id to (it.name to it.parentId) }
         val collections = data.collections.associate { it.id to (it.name to it.parentId) }
-        val collectionPaths = data.collections.associate { it.id to "Коллекции/${folderPath(it.id, collections)}" }
+        val collectionPaths = data.collections.associate { it.id to "Коллекции/${if (it.scope == CollectionScope.Consp) "Конспекты" else "Заметки и цитаты"}/${folderPath(it.id, collections)}" }
         val sourcePaths = data.documents.associate { it.id to "Источники/${stableName(it.title, it.id)}.md" }
         val notePaths = data.entries.associate { it.id to if (it.kind == EntryKind.Consp) "Конспекты/${stableName(it.title, it.id)}.md" else "Заметки/${if (it.anchor != null) "Цитаты" else "Самостоятельные"}/${stableName(it.title, it.id)}.md" }
         val desiredPdfPaths = data.documents.associate { d ->

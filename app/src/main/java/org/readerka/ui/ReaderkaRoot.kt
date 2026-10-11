@@ -53,6 +53,10 @@ import org.readerka.data.*
     val narrowWindow = LocalConfiguration.current.screenWidthDp < 1000
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var notesFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    var conspFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    var libraryFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    val catalogueFolders = mapOf("notes" to notesFolder, "consp" to conspFolder, "pdf" to libraryFolder)
+    val selectCatalogueFolder: (String, String?) -> Unit = { mode, id -> when (mode) { "notes" -> notesFolder = id; "consp" -> conspFolder = id; "pdf" -> libraryFolder = id; else -> Unit } }
     var importFolder by rememberSaveable { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> if (uris.isNotEmpty()) vm.import(uris, importFolder) }
@@ -159,7 +163,7 @@ import org.readerka.data.*
                         Column(Modifier.width(52.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { tabs.forEachIndexed { i, tab -> WorkspaceAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
                     }
                     if (wide && workspace.sidebarVisible && !fullscreen) {
-                        WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, {}, Modifier.width(workspace.sidebarWidth.dp).fillMaxHeight(), screen in listOf("notes", "consp"), notesFolder, { notesFolder = it }, consp = screen == "consp")
+                        WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, {}, Modifier.width(workspace.sidebarWidth.dp).fillMaxHeight(), screen in listOf("notes", "consp"), catalogueFolders, selectCatalogueFolder, consp = screen == "consp")
                         ResizeHandle("resize-sidebar", { vm.layout(sidebarWidth = vm.workspace.value.sidebarWidth + it) })
                     }
                     Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -174,15 +178,15 @@ import org.readerka.data.*
                                     else SplitWorkspace(workspace, vm, horizontal, available, paneContent)
                                 }
                                 "notes" -> NotesScreen(data, vm, notesFolder, { notesFolder = it }, { if (wide) vm.layout(sidebarVisible = true) else drawer = true }, export)
-                                "consp" -> NotesScreen(data, vm, notesFolder, { notesFolder = it }, { if (wide) vm.layout(sidebarVisible = true) else drawer = true }, export, consp = true)
+                                "consp" -> NotesScreen(data, vm, conspFolder, { conspFolder = it }, { if (wide) vm.layout(sidebarVisible = true) else drawer = true }, export, consp = true)
                                 "settings" -> SettingsScreen(preferences, data, vm, export, { restore.launch(arrayOf("application/zip", "application/octet-stream")) })
-                                else -> LibraryScreen(data, vm, false, importPdf, workspace = true)
+                                else -> LibraryScreen(data, vm, false, importPdf, workspace = true, folder = libraryFolder, onFolder = { libraryFolder = it })
                             }
                         }
                         if (!wide && drawer) ModalNavigationDrawer(drawerState = rememberDrawerState(DrawerValue.Open), drawerContent = {
                             ModalDrawerSheet(Modifier.widthIn(max = 320.dp)) {
                                 TextButton(onClick = { drawer = false }) { Text("Закрыть проводник") }
-                                WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, { drawer = false }, Modifier.fillMaxSize(), screen in listOf("notes", "consp"), notesFolder, { notesFolder = it }, consp = screen == "consp")
+                                WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, { drawer = false }, Modifier.fillMaxSize(), screen in listOf("notes", "consp"), catalogueFolders, selectCatalogueFolder, consp = screen == "consp")
                             }
                         }, gesturesEnabled = true) { }
                     }

@@ -13,6 +13,53 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class ReaderMigrationTest {
+    @Test fun upgradeVersion3SeparatesFoldersMembershipsAndOutlineHistory(): Unit = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
+        val name = "migration-v3-" + UUID.randomUUID() + ".db"
+        val file = app.getDatabasePath(name).apply { parentFile!!.mkdirs() }
+        val schema = Json.parseToJsonElement(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().context.assets
+            .open("org.readerka.data.LibraryDatabase/3.json").bufferedReader().use { it.readText() }).jsonObject.getValue("database").jsonObject
+        val outline = Entry("consp", "Original outline", comment = "Retained outline text", kind = EntryKind.Consp)
+        val draft = EntryDraft(outline, collections = setOf("child"))
+        try {
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+                schema.getValue("entities").jsonArray.forEach { entity ->
+                    val e = entity.jsonObject; val table = e.getValue("tableName").jsonPrimitive.content
+                    db.execSQL(e.getValue("createSql").jsonPrimitive.content.replace("${'$'}{TABLE_NAME}", table))
+                    e["indices"]?.jsonArray?.forEach { db.execSQL(it.jsonObject.getValue("createSql").jsonPrimitive.content.replace("${'$'}{TABLE_NAME}", table)) }
+                }
+                schema.getValue("setupQueries").jsonArray.forEach { db.execSQL(it.jsonPrimitive.content) }
+                db.execSQL("INSERT INTO collections(id,name,parentId) VALUES('root','Shared topic',NULL),('child','Chapter','root'),('empty','Empty',NULL)")
+                db.execSQL("INSERT INTO entries(id,title,quote,comment,type,color,createdAt,updatedAt,kind,sources) VALUES('note','Old note','','Retained note','GeneralNote','Green',123,456,'Note','[]'),('consp','Original outline','','Retained outline text','GeneralNote','Green',123,456,'Consp','[]')")
+                db.execSQL("INSERT INTO memberships(collectionId,entryId) VALUES('child','note'),('child','consp')")
+                db.execSQL("INSERT INTO note_versions(id,entryId,snapshot,createdAt,label) VALUES('version','consp',?,123,'Original')", arrayOf(kotlinx.serialization.json.Json.encodeToString(EntryDraft.serializer(), draft)))
+                db.version = 3
+            }
+            val database = LibraryDatabase.open(app, name)
+            try {
+                val repository = LibraryRepository(app, database)
+                val s = repository.dao.snapshot() // Room validates actual version 4 schema.
+                assertEquals(4, s.version)
+                assertEquals(2, s.entries.size)
+                assertEquals(6, s.collections.size)
+                assertEquals("Retained note", s.entries.first { it.id == "note" }.comment)
+                assertEquals("Retained outline text", s.entries.first { it.id == "consp" }.comment)
+                assertEquals("child", s.memberships.first { it.entryId == "note" }.collectionId)
+                assertEquals(legacyConspFolderId("child"), s.memberships.first { it.entryId == "consp" }.collectionId)
+                assertEquals(legacyConspFolderId("root"), s.collections.first { it.id == legacyConspFolderId("child") }.parentId)
+                assertEquals(setOf(legacyConspFolderId("child")), Json.decodeFromString(EntryDraft.serializer(), s.noteVersions.single().snapshot).collections)
+                org.readerka.export.BackupArchive.validate(s)
+                assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.batch(setOf("consp"), collection = "root") } }
+                assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.saveCollection(Collection("child", "Chapter", legacyConspFolderId("root"))) } }
+                repository.saveCollection(s.collections.first { it.id == legacyConspFolderId("root") }.copy(name = "Outline topic"))
+                assertEquals("Shared topic", repository.dao.allCollections().first { it.id == "root" }.name)
+                repository.dao.deleteCollection(legacyConspFolderId("root"))
+                assertEquals("root", repository.dao.allCollections().first { it.id == "child" }.parentId)
+                assertNull(repository.dao.allCollections().first { it.id == legacyConspFolderId("child") }.parentId)
+                assertEquals(2, repository.dao.allEntries().size)
+            } finally { database.close() }
+        } finally { app.deleteDatabase(name) }
+    }
     @Test fun upgradePreviewDatabase2KeepsNotesAndConvertsOnlyExplicitly(): Unit = runBlocking {
         val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
         val name = "migration-v2-" + UUID.randomUUID() + ".db"

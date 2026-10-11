@@ -52,8 +52,12 @@ data class Entry(
 )
 
 @Serializable
+enum class CollectionScope { Notes, Consp }
+
+@Serializable
 @Entity(tableName = "collections", foreignKeys = [ForeignKey(entity = Collection::class, parentColumns = ["id"], childColumns = ["parentId"], onDelete = ForeignKey.SET_NULL)], indices = [Index("parentId")])
-data class Collection(@PrimaryKey val id: String, val name: String, val parentId: String? = null)
+data class Collection(@PrimaryKey val id: String, val name: String, val parentId: String? = null,
+    @ColumnInfo(defaultValue = "'Notes'") val scope: CollectionScope = CollectionScope.Notes)
 
 @Serializable
 @Entity(tableName = "memberships", primaryKeys = ["collectionId", "entryId"], foreignKeys = [
@@ -111,7 +115,7 @@ data class NoteVersion(@PrimaryKey val id: String, val entryId: String, val snap
 
 @Serializable
 data class LibrarySnapshot(
-    val version: Int = 3, val documents: List<Document> = emptyList(), val documentFolders: List<DocumentFolder> = emptyList(),
+    val version: Int = 4, val documents: List<Document> = emptyList(), val documentFolders: List<DocumentFolder> = emptyList(),
     val entries: List<Entry> = emptyList(), val collections: List<Collection> = emptyList(),
     val memberships: List<Membership> = emptyList(), val tags: List<Tag> = emptyList(),
     val entryTags: List<EntryTag> = emptyList(), val documentTags: List<DocumentTag> = emptyList(), val bookmarks: List<Bookmark> = emptyList(),
@@ -120,6 +124,8 @@ data class LibrarySnapshot(
 )
 
 class Converters {
+    @TypeConverter fun scopeToString(value: CollectionScope) = value.name
+    @TypeConverter fun stringToScope(value: String) = CollectionScope.valueOf(value)
     @TypeConverter fun kindToString(value: EntryKind) = value.name
     @TypeConverter fun stringToKind(value: String) = EntryKind.valueOf(value)
     @TypeConverter fun sourcesToJson(value: List<String>): String = Json.encodeToString(value)

@@ -2,6 +2,7 @@
 
 package org.readerka.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -23,6 +24,50 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.readerka.R
 import org.readerka.data.FolderTree
+
+@Composable fun CataloguePath(folders: List<FolderItem>, selected: String?, root: String, onSelect: (String?) -> Unit) {
+    val path = remember(folders, selected) {
+        buildList {
+            var current = selected
+            while (current != null) {
+                val folder = folders.firstOrNull { it.id == current } ?: break
+                add(folder); current = folder.parentId
+            }
+        }.asReversed()
+    }
+    Row(Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+        if (selected != null) IconButton(onClick = { onSelect(folders.firstOrNull { it.id == selected }?.parentId) }, modifier = Modifier.testTag("catalogue-up")) { Icon(Outline.Left, "На уровень выше") }
+        TextButton(onClick = { onSelect(null) }, modifier = Modifier.testTag("catalogue-root")) { Icon(Outline.Folder, null); Text(root) }
+        path.forEach { folder ->
+            Text("/")
+            TextButton(onClick = { onSelect(folder.id) }, modifier = Modifier.testTag("catalogue-path-${folder.id}")) { Text(folder.name) }
+        }
+    }
+}
+
+/** Directory is an ordinary focusable/touchable catalogue item with explicit actions. */
+@Composable fun CatalogueFolder(folder: FolderItem, detail: String, onOpen: () -> Unit, onCreate: () -> Unit, onEdit: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).combinedClickable(onClick = onOpen, onLongClick = { menu = true }, role = androidx.compose.ui.semantics.Role.Button)
+            .testTag("catalogue-folder-${folder.id}").padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Outline.Folder, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(folder.name, style = MaterialTheme.typography.titleMedium)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Outline.Right, null, Modifier.size(20.dp))
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("catalogue-folder-menu-${folder.id}")) { Icon(Outline.More, "Действия папки ${folder.name}") }
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(text = { Text("Открыть папку") }, onClick = { menu = false; onOpen() })
+                    DropdownMenuItem(text = { Text("Создать подпапку") }, onClick = { menu = false; onCreate() })
+                    DropdownMenuItem(text = { Text("Переименовать / переместить / удалить") }, onClick = { menu = false; onEdit() })
+                }
+            }
+        }
+    }
+}
 
 /** Shared tree for panels, folder filters and multiple memberships; only visible rows are composed. */
 @Composable fun FolderBrowser(folders: List<FolderItem>, selected: String?, onSelect: (String?) -> Unit,

@@ -1,0 +1,9 @@
+Performing Streamed Install
+Success
+Performing Streamed Install
+Success
+Starting: Intent { cmp=org.readerka.preview/org.readerka.MainActivity }
+Status: timeout
+Activity: org.readerka.preview/org.readerka.MainActivity
+WaitTime: 11004
+Complete

@@ -32,7 +32,7 @@ class ConspWorkflowTest {
         when (input) {
             Input.Touch -> node.performTouchInput { click() }
             Input.Mouse -> node.performMouseInput { click() }
-            Input.Keyboard -> { node.performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }; node.performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) } }
+            Input.Keyboard -> { androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().setInTouchMode(false); compose.waitUntil(30_000) { var focused = false; node.performSemanticsAction(SemanticsActions.RequestFocus) { focused = it() }; focused }; node.performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) } }
         }
     }
     private fun key(code: Int, meta: Int = KeyEvent.META_CTRL_ON) = compose.runOnUiThread {
@@ -45,7 +45,7 @@ class ConspWorkflowTest {
         val a = Document("a-$id", "Book A", "a.pdf", "a-$id.pdf", pageCount = 3)
         val b = Document("b-$id", "Book B", "b.pdf", "b-$id.pdf", pageCount = 3)
         val source = Entry("source-$id", "Library note", comment = "Useful original text")
-        val folder = org.readerka.data.Collection("folder-$id", "Research topic")
+        val folder = org.readerka.data.Collection("folder-$id", "Research topic", scope = CollectionScope.Consp)
         val previous = runBlocking { WorkspaceStore(app).values.first() }
         val old = runBlocking { app.database.dao().snapshot() }
         val oldDrafts = vm.workspace.value.drafts.map { it.entry.id }.toSet()
