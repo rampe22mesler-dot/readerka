@@ -42,7 +42,7 @@ private data class Selection(val text: String, val anchor: Anchor, val view: Pdf
 private data class PdfMatch(val text: String, val anchor: Anchor)
 
 @OptIn(FlowPreview::class)
-@Composable fun ReaderScreen(session: ReaderSession?, data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit, onWorkspaceShortcut: (KeyEvent) -> Boolean = { false }, allowPageKeys: Boolean = true) {
+@Composable fun ReaderScreen(session: ReaderSession?, data: LibrarySnapshot, vm: LibraryViewModel, wide: Boolean, allowPageKeys: Boolean = true) {
     if (session == null) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.no_document_open)) }; return }
     key(session.engine) {
         val list = rememberLazyListState(session.page)
@@ -68,6 +68,9 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         var pageInput by remember { mutableStateOf("") }
         var search by remember { mutableStateOf(false) }
         var properties by remember { mutableStateOf(false) }
+        var selectionMenu by remember { mutableStateOf(false) }
+        var highlightMenu by remember { mutableStateOf(false) }
+        var pdfMenu by remember { mutableStateOf(false) }
         var translation by rememberSaveable { mutableStateOf<String?>(null) }
         val requestedTool by vm.readerTool.collectAsState()
         val currentPage by remember { derivedStateOf { list.firstVisibleItemIndex.coerceIn(0, session.engine.pageCount - 1) } }
@@ -116,12 +119,36 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             (activity?.currentFocus as? PdfPageView)?.clearFocus()
             vm.open(session.document, page = page.coerceIn(0, session.engine.pageCount - 1), recordHistory = false, pane = session.pane, tabId = session.tabId)
         }
+        fun createBookmark() { bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = session.offset) }
+        fun copySelection() { selection?.let { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), it.text)) } }
+        fun commentSelection() { selection?.let { s -> vm.editBeside(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text, documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor), session.pane) } }
         val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
-            if (!allowPageKeys || bookmark != null || jump || search || translation != null) false
+            if (!allowPageKeys || bookmark != null || jump || search || translation != null || properties || addConsp != null) false
             else {
-                val target = AppShortcuts.pdfKeys[event.keyCode]?.let { when (it) { Int.MIN_VALUE -> 0; Int.MAX_VALUE -> session.engine.pageCount - 1; else -> currentPage + it } }
-                if (target == null || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) false
-                else { if (event.action == KeyEvent.ACTION_DOWN) go(target); true }
+                val action = AppShortcuts.match(event)?.action
+                val named = action in (AppShortcuts.pdf.map { it.action } + listOf("search", "properties")) && (action !in setOf("copy-selection", "highlight", "translate", "selection-consp", "comment-selection") || selection != null)
+                val escape = action == "escape" && (showPanel || quickPages || selection != null || pdfMenu || selectionMenu)
+                val target = if (!event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed && !event.isShiftPressed) AppShortcuts.pdfKeys[event.keyCode]?.let { when (it) { Int.MIN_VALUE -> 0; Int.MAX_VALUE -> session.engine.pageCount - 1; else -> currentPage + it } } else null
+                if (named || escape) {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) when (action) {
+                        "materials" -> showPanel = !showPanel
+                        "quotes" -> { showPanel = true; bookmarksTab = false; conspTab = false }
+                        "bookmarks" -> { showPanel = true; bookmarksTab = true; conspTab = false }
+                        "book-consp" -> { showPanel = true; conspTab = true }
+                        "bookmark" -> createBookmark()
+                        "page" -> { pageInput = (currentPage + 1).toString(); jump = true }
+                        "search" -> search = true
+                        "properties" -> properties = true
+                        "fit" -> { fitPage = !fitPage; go(currentPage) }
+                        "copy-selection" -> copySelection()
+                        "highlight" -> selection?.let { s -> vm.highlight(s.text, s.anchor, vm.preferences.value.defaultColor, session.document); s.view.clearSelection(); selection = null }
+                        "translate" -> { copySelection(); translation = selection?.text }
+                        "selection-consp" -> { vm.focusPane(session.pane); addConsp = selection }
+                        "comment-selection" -> commentSelection()
+                        "escape" -> { showPanel = false; quickPages = false; selection?.view?.clearSelection(); selection = null; pdfMenu = false; selectionMenu = false }
+                    }
+                    true
+                } else if (target != null) { if (event.action == KeyEvent.ACTION_DOWN) go(target); true } else false
             }
         })
         DisposableEffect(session.engine, allowPageKeys) {
@@ -130,57 +157,48 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             onDispose { if (vm.readerKeyHandler === handler) vm.readerKeyHandler = null }
         }
         val selectionActions: @Composable () -> Unit = { selection?.let { s ->
-                Surface(tonalElevation = 3.dp, shadowElevation = 6.dp, shape = MaterialTheme.shapes.medium) { Column(Modifier.widthIn(max = 680.dp).padding(8.dp)) {
+            Surface(tonalElevation = 3.dp, shadowElevation = 6.dp, shape = MaterialTheme.shapes.medium) {
+                Column(Modifier.widthIn(max = 500.dp).padding(8.dp)) {
                     Text(s.text, maxLines = 1, style = MaterialTheme.typography.bodySmall)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = {
-                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text))
-                            translation = s.text
-                        }) { Text(stringResource(R.string.translate)) }
-                        TextButton(onClick = {
-                            vm.editBeside(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
-                                documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor), session.pane)
-                        }) { Text(stringResource(R.string.comment)) }
-                        TextButton(onClick = { vm.focusPane(session.pane); addConsp = s }) { Text("Добавить в конспект…") }
-                        TextButton(onClick = { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text)) }) { Text(stringResource(R.string.copy)) }
-                        IconButton(onClick = { s.view.clearSelection(); selection = null }) { Icon(Outline.Close, stringResource(R.string.clear_selection)) }
-                        ColorPalette(null) { color -> vm.highlight(s.text, s.anchor, color, session.document); s.view.clearSelection(); selection = null }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = ::copySelection, modifier = Modifier.heightIn(min = 48.dp)) { Text("Копировать") }
+                        TextButton(onClick = { vm.focusPane(session.pane); addConsp = s }, modifier = Modifier.heightIn(min = 48.dp)) { Text("В конспект") }
+                        Box {
+                            WorkspaceAction(Outline.More, "Действия выделения", { selectionMenu = true }, Modifier.testTag("selection-more"))
+                            DropdownMenu(selectionMenu, { selectionMenu = false }) {
+                                ShortcutMenuItem("translate", { selectionMenu = false; copySelection(); translation = s.text }, label = stringResource(R.string.translate))
+                                ShortcutMenuItem("comment-selection", { selectionMenu = false; commentSelection() })
+                                ShortcutMenuItem("highlight", { selectionMenu = false; highlightMenu = true }, label = "Цвет подсветки…")
+                                DropdownMenuItem(text = { Text("Снять выделение") }, trailingIcon = { Text("Esc") }, onClick = { selectionMenu = false; s.view.clearSelection(); selection = null })
+                            }
+                        }
                     }
                 }
-            } } }
+            }
+        } }
         Column(Modifier.fillMaxSize()) {
-            var help by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                WorkspaceAction(Outline.Note, "Цитаты в PDF", { showPanel = !showPanel || bookmarksTab || conspTab; bookmarksTab = false; conspTab = false }, Modifier.testTag("reader-quotes-button"), selected = showPanel && !bookmarksTab && !conspTab)
-                WorkspaceAction(Outline.Bookmark, "Закладки", { showPanel = !showPanel || !bookmarksTab || conspTab; bookmarksTab = true; conspTab = false }, Modifier.testTag("reader-bookmarks-button"), selected = showPanel && bookmarksTab && !conspTab)
-                WorkspaceAction(Outline.Plus, "Добавить закладку", { bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = session.offset) })
-                WorkspaceAction(Outline.Edit, "Конспекты книги", { showPanel = !showPanel || !conspTab; conspTab = true }, Modifier.testTag("reader-consp-button"), selected = showPanel && conspTab)
-                WorkspaceAction(Outline.Plus, "Создать конспект", { vm.focusPane(session.pane); createConsp = true }, Modifier.testTag("reader-create-consp"))
-                WorkspaceAction(Outline.Search, "Поиск в PDF", { search = true })
-                WorkspaceAction(Outline.Settings, "Свойства PDF", { properties = true })
+                TextButton(onClick = { showPanel = !showPanel }, modifier = Modifier.heightIn(min = 48.dp).testTag("reader-materials-button"), colors = ButtonDefaults.textButtonColors(containerColor = if (showPanel) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)) { Icon(Outline.Folder, null, Modifier.size(18.dp)); Text("Материалы") }
+                WorkspaceAction(Outline.Search, "Поиск в PDF · " + AppShortcuts.keys("search"), { search = true })
                 TextButton(onClick = { quickPages = !quickPages }, modifier = Modifier.heightIn(min = 48.dp).testTag("reader-page-counter")) { Text(stringResource(R.string.page, currentPage + 1, session.engine.pageCount)) }
-                TextButton(onClick = { fitPage = !fitPage; go(currentPage) }) { Text(stringResource(if (fitPage) R.string.fit_width else R.string.fit_page)) }
-                WorkspaceAction(Outline.Split, "Открыть справа", { vm.openRight(WorkspaceTab(session.tabId, session.document.id, WorkspaceKind.Pdf, page = currentPage, offset = session.offset), session.pane) })
-                WorkspaceAction(Outline.Fullscreen, if (fullscreen) "Выйти из полного экрана" else "Полный экран", { onFullscreen(!fullscreen) })
-                var menu by remember { mutableStateOf(false) }
                 Box {
-                    WorkspaceAction(Outline.More, "Действия PDF", { menu = true })
-                    DropdownMenu(menu, { menu = false }) {
-                        DropdownMenuItem(text = { Text("Справка по чтению") }, onClick = { menu = false; help = true })
-
+                    WorkspaceAction(Outline.More, "Действия PDF", { pdfMenu = true }, Modifier.testTag("reader-more"))
+                    DropdownMenu(pdfMenu, { pdfMenu = false }) {
+                        ShortcutMenuItem("bookmark", { pdfMenu = false; createBookmark() })
+                        ShortcutMenuItem("consp", { pdfMenu = false; vm.focusPane(session.pane); createConsp = true }, label = "Создать конспект по книге", modifier = Modifier.testTag("reader-create-consp"))
+                        ShortcutMenuItem("page", { pdfMenu = false; pageInput = (currentPage + 1).toString(); jump = true })
+                        ShortcutMenuItem("fit", { pdfMenu = false; fitPage = !fitPage; go(currentPage) }, label = stringResource(if (fitPage) R.string.fit_width else R.string.fit_page))
+                        ShortcutMenuItem("properties", { pdfMenu = false; properties = true })
+                        ShortcutMenuItem("right", { pdfMenu = false; vm.openRight(WorkspaceTab(session.tabId, session.document.id, WorkspaceKind.Pdf, page = currentPage, offset = session.offset), session.pane) })
                     }
                 }
             }
             HorizontalDivider()
-            if (help) HelpDialog { help = false }
             if (createConsp) CreateConspDialog(data, session.document.id, null, vm) { createConsp = false }
             addConsp?.let { selected -> ConspQuoteDialog(selected.text, session.document, selected.anchor.page, data, vm) { addConsp = null } }
             Row(Modifier.weight(1f)) {
-                if (!wide && showPanel && conspTab) {
-                    BookConspPanel(session.document, data, vm, session.pane, { showPanel = false }, Modifier.fillMaxSize())
-                } else if (!wide && showPanel) {
-                    ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                        { vm.editBeside(it, session.pane) }, { vm.source(it); showPanel = false }, { vm.openBookmark(it); showPanel = false }, { showPanel = false }, Modifier.fillMaxSize())
+                if (!wide && showPanel) {
+                    BookMaterialsPanel(session, docEntries, docBookmarks, data, vm, if (conspTab) 2 else if (bookmarksTab) 1 else 0, { tab -> bookmarksTab = tab == 1; conspTab = tab == 2 }, { showPanel = false }, Modifier.fillMaxSize())
                 } else {
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().onSizeChanged { viewport = it }) {
                         LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("pdf-pages"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -194,9 +212,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                     }
                     if (wide && showPanel) {
                         ResizeHandle("resize-structure", { vm.layout(structureWidth = vm.workspace.value.structureWidth - it) })
-                        if (conspTab) BookConspPanel(session.document, data, vm, session.pane, { showPanel = false }, Modifier.width(workspace.structureWidth.dp).fillMaxHeight())
-                        else ReaderPanel(session.document, docEntries, docBookmarks, data, vm, bookmarksTab, { bookmarksTab = it },
-                            { vm.editEntry(it, 1 - session.pane); vm.layout(split = true) }, { vm.source(it) }, { vm.openBookmark(it) }, { showPanel = false }, Modifier.width(workspace.structureWidth.dp).fillMaxHeight())
+                        BookMaterialsPanel(session, docEntries, docBookmarks, data, vm, if (conspTab) 2 else if (bookmarksTab) 1 else 0, { tab -> bookmarksTab = tab == 1; conspTab = tab == 2 }, { showPanel = false }, Modifier.width(workspace.structureWidth.dp).fillMaxHeight(), closeOnNavigate = false)
                     }
                 }
             }
@@ -206,13 +222,31 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 }, { quickPages = false })
             }
         }
+        if (highlightMenu) AlertDialog(onDismissRequest = { highlightMenu = false }, title = { Text("Цвет подсветки") }, text = { ColorPalette(null) { color -> selection?.let { vm.highlight(it.text, it.anchor, color, session.document); it.view.clearSelection(); selection = null }; highlightMenu = false } }, confirmButton = { TextButton(onClick = { highlightMenu = false }) { Text("Отмена") } })
         translation?.let { TranslationOverlay(it) { translation = null } }
-        if (jump) AlertDialog(onDismissRequest = { jump = false }, title = { Text(stringResource(R.string.jump_to_page)) }, text = { OutlinedTextField(pageInput, { pageInput = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.page_number)) }) },
+        if (jump) AlertDialog(onDismissRequest = { jump = false }, title = { Text(stringResource(R.string.jump_to_page)) }, text = { OutlinedTextField(pageInput, { pageInput = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.page_number)) }, modifier = Modifier.testTag("pdf-page-input")) },
             confirmButton = { TextButton(enabled = (pageInput.toIntOrNull() ?: 0) in 1..session.engine.pageCount, onClick = { go(pageInput.toInt() - 1); jump = false }) { Text(stringResource(R.string.go)) } }, dismissButton = { TextButton(onClick = { jump = false }) { Text(stringResource(R.string.cancel)) } })
         bookmark?.let { b -> BookmarkEditor(b, data, { bookmark = null }, { vm.saveBookmark(it) }) }
 
         if (properties) DocumentEditor(data.documents.firstOrNull { it.id == session.document.id } ?: session.document, data, { properties = false }, vm::saveDocument)
         if (search) PdfSearchDialog(session, { search = false }, { anchor -> vm.open(session.document, anchor); search = false })
+    }
+}
+
+@Composable private fun BookMaterialsPanel(session: ReaderSession, entries: List<Entry>, bookmarks: List<Bookmark>, data: LibrarySnapshot, vm: LibraryViewModel, tab: Int, onTab: (Int) -> Unit, onClose: () -> Unit, modifier: Modifier, closeOnNavigate: Boolean = true) {
+    Column(modifier.testTag("book-materials-panel")) {
+        Row(Modifier.padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Материалы книги", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+            TextButton(onClick = onClose, modifier = Modifier.testTag("hide-book-materials")) { Text("Скрыть") }
+        }
+        Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("Цитаты" to "reader-quotes-button", "Закладки" to "reader-bookmarks-button", "Конспекты" to "reader-consp-button").forEachIndexed { index, (name, tag) -> FilterChip(tab == index, { onTab(index) }, label = { Text(name, style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.heightIn(min = 48.dp).testTag(tag)) }
+        }
+        HorizontalDivider()
+        Box(Modifier.weight(1f)) {
+            if (tab == 2) BookConspPanel(session.document, data, vm, session.pane, onClose, Modifier.fillMaxSize(), showHeader = false)
+            else ReaderPanel(session.document, entries, bookmarks, data, vm, tab == 1, { onTab(if (it) 1 else 0) }, { vm.editBeside(it, session.pane) }, { vm.source(it); if (closeOnNavigate) onClose() }, { vm.openBookmark(it); if (closeOnNavigate) onClose() }, onClose, Modifier.fillMaxSize(), showHeader = false)
+        }
     }
 }
 
@@ -226,7 +260,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 IconButton(enabled = page > 0, onClick = { onPage(page - 1) }) { Icon(Outline.Left, stringResource(R.string.previous_page)) }
                 TextButton(onClick = onNumber, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.page, preview.roundToInt() + 1, count)) }
                 IconButton(enabled = page < count - 1, onClick = { onPage(page + 1) }) { Icon(Outline.Right, stringResource(R.string.next_page)) }
-                IconButton(onClick = onClose) { Icon(Outline.Close, stringResource(R.string.close)) }
+                TextButton(onClick = onClose, modifier = Modifier.testTag("close-page-strip")) { Text("Готово") }
             }
             Slider(value = preview, onValueChange = { dragging = true; preview = it }, enabled = count > 1,
                 valueRange = 0f..(count - 1).coerceAtLeast(1).toFloat(), onValueChangeFinished = {

@@ -1,0 +1,3 @@
+10-10 20:29:00.449  9948  9948 I System.out: Pane key delivered code=61 meta=4098 action=1 handled=true active=1
+10-10 20:29:01.237  9948  9948 I System.out: Pane key result requestedMeta=4098 active=1 split=true focus=AndroidComposeView
+10-10 20:29:32.776  9948  9948 I System.out: IME editor focus=false y=759 height=515 scroll=0 selection=854 lineBottom=483

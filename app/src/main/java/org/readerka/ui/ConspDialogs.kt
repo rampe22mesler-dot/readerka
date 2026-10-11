@@ -43,12 +43,12 @@ import org.readerka.data.*
     }, confirmButton = { TextButton(onClick = { vm.createFromQuote(text, document, page); onDismiss() }) { Text("Создать конспект из выделения…") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } })
 }
 
-@Composable fun BookConspPanel(document: Document, data: LibrarySnapshot, vm: LibraryViewModel, pane: Int, onClose: () -> Unit, modifier: Modifier) {
+@Composable fun BookConspPanel(document: Document, data: LibrarySnapshot, vm: LibraryViewModel, pane: Int, onClose: () -> Unit, modifier: Modifier, showHeader: Boolean = true) {
     var creating by remember { mutableStateOf(false) }
     Column(modifier.padding(8.dp).testTag("book-consp-panel")) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        if (showHeader) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text("Конспекты · ${document.title}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-            WorkspaceAction(Outline.Close, "Закрыть панель конспектов", onClose)
+            TextButton(onClick = onClose) { Text("Скрыть") }
         }
         TextButton(onClick = { creating = true }) { Text("Создать конспект по книге") }
         val entries = data.entries.filter { it.kind == EntryKind.Consp && document.id in it.sourceBooks() }

@@ -27,7 +27,7 @@ class ResearchEditText(context: Context) : EditText(context) {
 }
 
 @Composable fun RichEditor(value: RichText, selection: TextRange, onChange: (RichText, TextRange) -> Unit, onSelection: (TextRange) -> Unit,
-    onFocus: () -> Unit, onView: (ResearchEditText) -> Unit, modifier: Modifier = Modifier) {
+    onFocus: () -> Unit, onView: (ResearchEditText) -> Unit, modifier: Modifier = Modifier, label: String = "Текст документа") {
     val foreground = MaterialTheme.colorScheme.onSurface.toArgb()
     val accent = MaterialTheme.colorScheme.primary.toArgb()
     val scale = LocalDensity.current.fontScale
@@ -51,7 +51,7 @@ class ResearchEditText(context: Context) : EditText(context) {
         inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         setTextSize(17f * scale); setPadding(0, 8, 0, 24); setBackgroundColor(android.graphics.Color.TRANSPARENT)
         minLines = 12; isVerticalScrollBarEnabled = false
-        contentDescription = "Текст конспекта"
+        contentDescription = label
         setOnFocusChangeListener { _, focused -> nativeFocused = focused; if (focused) onFocus() }
         selectionObserver = { a, b -> if (a >= 0 && b >= 0) select(TextRange(a, b)) }
         addTextChangedListener(object : TextWatcher {
@@ -65,6 +65,7 @@ class ResearchEditText(context: Context) : EditText(context) {
             }
         })
     } }, update = { editor ->
+        editor.contentDescription = label
         editor.setTextColor(foreground); editor.setTextSize(17f * scale)
         editor.updating = true
         if (editor.text.toString() != value.text) editor.setText(value.text)
@@ -96,7 +97,21 @@ class ResearchEditText(context: Context) : EditText(context) {
             }
             if (end > block.start) when (block.style) {
                 BlockStyle.Heading -> { editable.setSpan(RelativeSizeSpan(when (block.level) { 1 -> 1.6f; 2 -> 1.35f; else -> 1.15f }), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); editable.setSpan(StyleSpan(Typeface.BOLD), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-                BlockStyle.LinkCard -> { editable.setSpan(BackgroundColorSpan(accent and 0x00ffffff or 0x18000000), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); editable.setSpan(ForegroundColorSpan(accent), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+                BlockStyle.LinkCard -> {
+                    editable.setSpan(ForegroundColorSpan(accent), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    editable.setSpan(object : LineBackgroundSpan {
+                        override fun drawBackground(canvas: android.graphics.Canvas, paint: android.graphics.Paint, left: Int, right: Int, top: Int, baseline: Int, bottom: Int, text: CharSequence, start: Int, end: Int, lineNumber: Int) {
+                            val previous = paint.color; paint.color = accent and 0x00ffffff or 0x18000000
+                            canvas.drawRoundRect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat(), 6f, 6f, paint); paint.color = previous
+                        }
+                    }, block.start, paragraphEnd, Spanned.SPAN_PARAGRAPH)
+                    editable.setSpan(object : LeadingMarginSpan {
+                        override fun getLeadingMargin(first: Boolean) = (editor.resources.displayMetrics.density * 30).toInt()
+                        override fun drawLeadingMargin(canvas: android.graphics.Canvas, paint: android.graphics.Paint, x: Int, dir: Int, top: Int, baseline: Int, bottom: Int, text: CharSequence, start: Int, end: Int, first: Boolean, layout: android.text.Layout) {
+                            if (first) { val previous = paint.color; paint.color = accent; canvas.drawText("↗", x.toFloat(), baseline.toFloat(), paint); paint.color = previous }
+                        }
+                    }, block.start, paragraphEnd, Spanned.SPAN_PARAGRAPH)
+                }
                 BlockStyle.Code -> editable.setSpan(TypefaceSpan("monospace"), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 else -> Unit
             }

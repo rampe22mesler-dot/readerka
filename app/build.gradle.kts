@@ -14,8 +14,8 @@ android {
         manifestPlaceholders["readerkaLabel"] = if (preview) "Readerka Preview" else "Readerka"
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = if (preview) "0.7.0-preview" else "0.7.0"
+        versionCode = 8
+        versionName = if (preview) "0.8.0-preview" else "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }

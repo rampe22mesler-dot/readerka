@@ -142,7 +142,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                             }
                         }, onLongClick = { menu = true })
                         .padding(start = (8 + row.depth * 12).coerceAtMost(68).dp).testTag("explorer-${row.id}"), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (row.folder != null) { if (row.folder.id in expanded) Outline.Down else Outline.Right } else if (row.document != null) Outline.File else Outline.Note, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(if (row.folder != null) { if (row.folder.id in expanded) Outline.Down else Outline.Right } else if (row.document != null) Outline.File else when (row.entry?.kind) { EntryKind.Consp -> Outline.Consp; EntryKind.Quote -> Outline.Quote; else -> Outline.Edit }, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (rename == row.folder?.id && rename != null) {
                             BasicTextField(renameText, { renameText = it }, singleLine = true, textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(6.dp).testTag("rename-folder"))
                             WorkspaceAction(Outline.Save, "Сохранить имя", {
@@ -197,7 +197,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                     var dragDelta by remember { mutableFloatStateOf(0f) }
                     Row(Modifier.mouseDrag({ dragStart = null; dragDelta = 0f }, { if (dragStart == null) dragStart = it.x; dragDelta = it.x - (dragStart ?: it.x) }, { if (kotlin.math.abs(dragDelta) > 60) vm.moveTab(pane, tab.id, if (dragDelta > 0) 1 else -1) }).width(248.dp).heightIn(min = 48.dp).background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
                         .combinedClickable(onClick = { vm.selectTab(pane, tab.id) }, onLongClick = { menu = true }).testTag("workspace-tab-${tab.id}"), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (tab.pinned) Outline.Pin else if (tab.kind == WorkspaceKind.Pdf) Outline.File else Outline.Note, null, Modifier.padding(start = 10.dp).size(18.dp), tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(if (tab.pinned) Outline.Pin else if (tab.kind == WorkspaceKind.Pdf) Outline.File else when ((drafts.firstOrNull { it.entry.id == tab.documentId }?.entry ?: data.entries.firstOrNull { it.id == tab.documentId })?.kind) { EntryKind.Consp -> Outline.Consp; EntryKind.Quote -> Outline.Quote; else -> Outline.Edit }, null, Modifier.padding(start = 10.dp).size(18.dp), tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(title?.ifBlank { "Без названия" } ?: "Документ недоступен", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
                         Box {
                             WorkspaceAction(Outline.More, "Действия вкладки", { menu = true }, Modifier.testTag("tab-menu-${tab.id}"))

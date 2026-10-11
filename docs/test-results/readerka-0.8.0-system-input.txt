@@ -1,0 +1,6 @@
+10-10 20:11:58.010  1823  1868 W Looper  : Slow dispatch took 125ms android.ui h=com.android.server.policy.ImmersiveModeConfirmation$H c=null m=1
+10-10 20:12:05.203  1693  1729 W SurfaceFlinger: Attempting to destroy on removed layer: 650080e ImmersiveModeConfirmation#0
+10-10 20:14:47.176  1823  1941 W InputDispatcher: Permission denied: injecting event from pid 9221 uid 10089 to window Window{64ec98c u0 ImmersiveModeConfirmation} owned by uid 1000
+10-10 20:14:47.177  1823  7687 W InputManager: Input event injection from pid 9221 permission denied.
+10-10 20:14:49.281  1823  1868 W Looper  : Slow dispatch took 518ms android.ui h=com.android.server.policy.ImmersiveModeConfirmation$H c=null m=2
+10-10 20:14:50.556  1693  1887 W SurfaceFlinger: Attempting to destroy on removed layer: 64ec98c ImmersiveModeConfirmation#0

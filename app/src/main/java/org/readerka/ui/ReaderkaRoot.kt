@@ -5,6 +5,7 @@ import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -25,6 +26,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import org.readerka.MainActivity
 import org.readerka.data.*
 
@@ -42,6 +46,7 @@ import org.readerka.data.*
     val readers by vm.readers.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val workspace by vm.workspace.collectAsStateWithLifecycle()
+    var appMenu by remember { mutableStateOf(false) }
     var commands by remember { mutableStateOf(false) }
     var sourcesOnly by remember { mutableStateOf(false) }
     var helpOpen by remember { mutableStateOf(false) }
@@ -67,8 +72,8 @@ import org.readerka.data.*
         }
     }
     val importPdf: (String?) -> Unit = { folder -> if (busy == null) { importFolder = folder; import.launch(arrayOf("application/pdf")) } }
-    val tabs = listOf("library" to "Библиотека", "reader" to "Чтение", "notes" to "Заметки и цитаты", "consp" to "Конспекты", "settings" to "Настройки")
-    val icons = listOf(Outline.Folder, Outline.Book, Outline.Note, Outline.Edit, Outline.Settings)
+    val tabs = listOf("library" to "Библиотека", "reader" to "Чтение", "notes" to "Заметки", "consp" to "Конспекты", "settings" to "Настройки")
+    val icons = listOf(Outline.Folder, Outline.Book, Outline.Edit, Outline.Consp, Outline.Settings)
     val dark = when (preferences.theme) { ThemeMode.System -> isSystemInDarkTheme(); ThemeMode.Dark -> true; ThemeMode.Light -> false }
     val colors = if (dark) darkColorScheme(primary = Color(0xFFB7A2ED), onPrimary = Color(0xFF281C40), secondaryContainer = Color(0xFF343044),
         surface = Color(0xFF222226), background = Color(0xFF222226), surfaceContainerLow = Color(0xFF1B1B1F), surfaceContainer = Color(0xFF29292F), surfaceContainerHigh = Color(0xFF313137), outlineVariant = Color(0xFF39393F), onSurface = Color(0xFFE4E3E8), onSurfaceVariant = Color(0xFFB4B1BE))
@@ -83,26 +88,41 @@ import org.readerka.data.*
             if (fullscreen) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
         }
     }
+    val notificationScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val selected = workspace.panes[workspace.activePane].selected
     val reader = readers[workspace.activePane].takeIf { selected?.kind == WorkspaceKind.Pdf }
+    val canExportEntry = selected?.kind == WorkspaceKind.Note && (data.entries.any { it.id == selected.documentId } || workspace.drafts.any { it.entry.id == selected.documentId && it.entry.kind == EntryKind.Consp && it.entry.title.isNotBlank() })
+    val paneFocus = remember { listOf(FocusRequester(), FocusRequester()) }
+    var pendingPaneFocus by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(pendingPaneFocus, screen, workspace.activePane) {
+        pendingPaneFocus?.takeIf { screen == "reader" && it == workspace.activePane }?.let {
+            // The destination may have been absent from the library or hidden by the IME.
+            // Request focus after Compose has attached the newly visible pane.
+            paneFocus[it].requestFocus()
+            pendingPaneFocus = null
+        }
+    }
     val currentData by rememberUpdatedState(data)
     val currentWorkspace by rememberUpdatedState(workspace)
     val currentReaders by rememberUpdatedState(readers)
-    val currentFullscreen by rememberUpdatedState(fullscreen)
-    val paneKeys by rememberUpdatedState(!commands && !draftsOpen && !layoutOpen && !helpOpen && !createConsp)
-    val pane0 = remember(vm) { movableContentOf { WorkspacePaneContent(0, currentData, vm, currentReaders[0], currentWorkspace, currentFullscreen, { fullscreen = it }, paneKeys) } }
-    val pane1 = remember(vm) { movableContentOf { WorkspacePaneContent(1, currentData, vm, currentReaders[1], currentWorkspace, currentFullscreen, { fullscreen = it }, paneKeys) } }
+    val paneKeys by rememberUpdatedState(!commands && !draftsOpen && !layoutOpen && !helpOpen && !createConsp && !appMenu)
+    val pane0 = remember(vm) { movableContentOf { WorkspacePaneContent(0, currentData, vm, currentReaders[0], currentWorkspace, paneKeys, paneFocus[0]) } }
+    val pane1 = remember(vm) { movableContentOf { WorkspacePaneContent(1, currentData, vm, currentReaders[1], currentWorkspace, paneKeys, paneFocus[1]) } }
     val shortcut: (KeyEvent) -> Boolean = shortcut@{ event ->
-        if (!commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp && selected?.kind == WorkspaceKind.Note && vm.editorKeyHandler?.invoke(event) == true) return@shortcut true
+        val free = !commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp && !appMenu
+        if (free && screen == "reader" && selected?.kind == WorkspaceKind.Note && vm.editorKeyHandler?.invoke(event) == true) return@shortcut true
+        if (free && screen == "reader" && reader != null && vm.readerKeyHandler?.invoke(event) == true) return@shortcut true
         val action = AppShortcuts.match(event)?.action
-        val recognized = action != null
-        if (recognized && event.action == KeyEvent.ACTION_DOWN) when (action) {
+        var recognized = action in AppShortcuts.global.map { it.action }
+        if (!free && action !in setOf("escape", "help")) return@shortcut false
+        if (recognized && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) when (action) {
             "back" -> if (canReturn) vm.returnToNote() else vm.historyBack()
             "forward" -> vm.historyForward()
-            "search" -> if (reader != null) vm.requestReaderTool(ReaderTool.Search)
+            "search", "properties" -> recognized = false
             "commands" -> { commands = true; sourcesOnly = false }
             "sources" -> { commands = true; sourcesOnly = true }
+            "import" -> importPdf(null)
             "note" -> vm.newNote(reader?.document?.id, notesFolder.takeIf { screen == "notes" })
             "consp" -> createConsp = true
             "save" -> vm.saveEditor(selected?.documentId?.takeIf { selected.kind == WorkspaceKind.Note })
@@ -112,12 +132,32 @@ import org.readerka.data.*
             "previous" -> vm.nextTab(-1)
             "fullscreen" -> fullscreen = !fullscreen
             "help" -> helpOpen = true
-            "escape" -> when { fullscreen -> fullscreen = false; helpOpen -> helpOpen = false; commands -> commands = false; layoutOpen -> layoutOpen = false; draftsOpen -> draftsOpen = false; createConsp -> createConsp = false; else -> return@shortcut false }
+            "drafts" -> draftsOpen = true
+            "layout" -> layoutOpen = true
+            "split" -> { if (workspace.split) vm.maximizePane(workspace.activePane) else vm.layout(split = true); vm.navigate("reader") }
+            "maximize" -> vm.maximizePane(workspace.activePane)
+            "other-pane" -> if (workspace.split) {
+                val other = 1 - workspace.activePane
+                activity.currentFocus?.clearFocus()
+                focusManager.clearFocus(force = true)
+                vm.navigate("reader"); vm.focusPane(other); pendingPaneFocus = other
+            }
+            "right" -> selected?.let { vm.openRight(it) }
+            "pin" -> selected?.let { vm.pinTab(workspace.activePane, it.id) }
+            "tab-left", "tab-right" -> selected?.let { vm.moveTab(workspace.activePane, it.id, if (action == "tab-left") -1 else 1) }
+            "library" -> vm.navigate("library")
+            "notes" -> vm.navigate("notes")
+            "consp-catalogue" -> vm.navigate("consp")
+            "settings" -> vm.navigate("settings")
+            "reading" -> vm.navigate("reader")
+            "export" -> if (canExportEntry) export(ExportKind.Markdown, setOf(selected!!.documentId)) else notificationScope.launch { snackbar.showSnackbar("Сначала сохраните запись для экспорта") }
+            "escape" -> when { appMenu -> appMenu = false; helpOpen -> helpOpen = false; commands -> commands = false; layoutOpen -> layoutOpen = false; draftsOpen -> draftsOpen = false; createConsp -> createConsp = false; drawer -> drawer = false; fullscreen -> fullscreen = false; else -> recognized = false }
+            else -> recognized = false
         }
-        if (!recognized && event.keyCode == KeyEvent.KEYCODE_TAB && !event.isCtrlPressed && !commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp) {
+        if (!recognized && event.keyCode == KeyEvent.KEYCODE_TAB && !event.isCtrlPressed && !event.isAltPressed && free) {
             if (event.action == KeyEvent.ACTION_DOWN) focusManager.moveFocus(if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next)
             true
-        } else recognized || (screen == "reader" && !commands && !draftsOpen && !layoutOpen && !helpOpen && !createConsp && reader != null && vm.readerKeyHandler?.invoke(event) == true)
+        } else recognized
     }
     val currentShortcut by rememberUpdatedState(shortcut)
     DisposableEffect(activity) { (activity as? MainActivity)?.workspaceShortcut = { currentShortcut(it) }; onDispose { (activity as? MainActivity)?.workspaceShortcut = null } }
@@ -132,31 +172,42 @@ import org.readerka.data.*
             BackHandler(drawer) { drawer = false }
             val toggleSidebar = { if (wide) vm.layout(sidebarVisible = !workspace.sidebarVisible) else drawer = !drawer }
             Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
-                if (!fullscreen) Surface(color = colors.surfaceContainerLow) {
+                Surface(color = colors.surfaceContainerLow) {
                     Column(Modifier.statusBarsPadding()) {
                         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                            WorkspaceAction(Outline.Menu, "Проводник · Ctrl+B", toggleSidebar, Modifier.testTag("toggle-workspace-sidebar"))
-                            Text("Readerka", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.weight(1f))
-                            if (windowWidth > 600.dp) {
-                                WorkspaceAction(Outline.Left, "Назад · Alt+←", { if (canReturn) vm.returnToNote() else vm.historyBack() }, enabled = canReturn || workspace.history.canBack)
-                                WorkspaceAction(Outline.Right, "Вперёд · Alt+→", vm::historyForward, enabled = workspace.history.canForward)
+                            if (!fullscreen) {
+                                WorkspaceAction(Outline.Menu, "Проводник · " + AppShortcuts.keys("sidebar"), toggleSidebar, Modifier.testTag("toggle-workspace-sidebar"))
+                                Text("Readerka", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.weight(1f))
+                                if (windowWidth > 700.dp) {
+                                    WorkspaceAction(Outline.Left, "Назад · Alt+←", { if (canReturn) vm.returnToNote() else vm.historyBack() }, enabled = canReturn || workspace.history.canBack)
+                                    WorkspaceAction(Outline.Right, "Вперёд · Alt+→", vm::historyForward, enabled = workspace.history.canForward)
+                                }
+                                WorkspaceAction(Outline.Search, "Команды · Ctrl+P", { commands = true; sourcesOnly = false }, Modifier.testTag("quick-commands"))
+                            } else Text("${workspace.activePane + 1} · активная область", Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.labelSmall)
+                            WorkspaceAction(Outline.Split, "Области и размеры · " + AppShortcuts.keys("layout"), { layoutOpen = true }, Modifier.testTag("workspace-layout"), selected = workspace.split)
+                            WorkspaceAction(Outline.Fullscreen, (if (fullscreen) "Выйти из полного экрана" else "Полный экран") + " · F11", { fullscreen = !fullscreen }, Modifier.testTag("fullscreen-button"), selected = fullscreen)
+                            Box {
+                                WorkspaceAction(Outline.More, "Меню приложения", { appMenu = true }, Modifier.testTag("app-menu"))
+                                DropdownMenu(appMenu, { appMenu = false }) {
+                                    ShortcutMenuItem("import", { appMenu = false; importPdf(null) })
+                                    ShortcutMenuItem("note", { appMenu = false; vm.newNote(reader?.document?.id) })
+                                    ShortcutMenuItem("consp", { appMenu = false; createConsp = true })
+                                    ShortcutMenuItem("drafts", { appMenu = false; draftsOpen = true }, modifier = Modifier.testTag("open-drafts"))
+                                    ShortcutMenuItem("settings", { appMenu = false; vm.navigate("settings") })
+                                    ShortcutMenuItem("export", { appMenu = false; export(ExportKind.Markdown, setOfNotNull(selected?.documentId)) }, enabled = canExportEntry)
+                                    ShortcutMenuItem("help", { appMenu = false; helpOpen = true }, modifier = Modifier.testTag("help-button"))
+                                }
                             }
-                            WorkspaceAction(Outline.Search, "Команды · Ctrl+P", { commands = true; sourcesOnly = false }, Modifier.testTag("quick-commands"))
-                            WorkspaceAction(Outline.Edit, "Черновики (${workspace.drafts.size})", { draftsOpen = true }, Modifier.testTag("open-drafts"))
-                            WorkspaceAction(Outline.Split, "Области и размеры", { layoutOpen = true }, Modifier.testTag("workspace-layout"), selected = workspace.split)
-                            WorkspaceAction(Outline.Fullscreen, "Полный экран · F11", { fullscreen = true }, Modifier.testTag("fullscreen-button"))
-                            WorkspaceAction(Outline.Help, "Справка · F1", { helpOpen = true }, Modifier.testTag("help-button"))
-                            WorkspaceAction(Outline.Plus, "Добавить PDF", { importPdf(null) })
                         }
                         HorizontalDivider()
                     }
                 }
             }, bottomBar = {
-                if (windowWidth < 600.dp && !fullscreen && !imeVisible) Row(Modifier.fillMaxWidth().navigationBarsPadding(), horizontalArrangement = Arrangement.SpaceEvenly) { tabs.forEachIndexed { i, tab -> WorkspaceAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
+                if (windowWidth < 600.dp && !fullscreen && !imeVisible) Row(Modifier.fillMaxWidth().navigationBarsPadding(), horizontalArrangement = Arrangement.SpaceEvenly) { tabs.forEachIndexed { i, tab -> NavigationAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
             }) { padding ->
                 Row(Modifier.fillMaxSize().padding(padding)) {
                     if (windowWidth >= 600.dp && !fullscreen) Surface(color = colors.surfaceContainerLow) {
-                        Column(Modifier.width(52.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { tabs.forEachIndexed { i, tab -> WorkspaceAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
+                        Column(Modifier.width(80.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { tabs.forEachIndexed { i, tab -> NavigationAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
                     }
                     if (wide && workspace.sidebarVisible && !fullscreen) {
                         WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, {}, Modifier.width(workspace.sidebarWidth.dp).fillMaxHeight(), screen in listOf("notes", "consp"), notesFolder, { notesFolder = it }, consp = screen == "consp")
@@ -167,10 +218,10 @@ import org.readerka.data.*
                             busy?.let { Text(activity.getString(it.label), style = MaterialTheme.typography.labelMedium); LinearProgressIndicator(Modifier.fillMaxWidth()) }
                             when (screen) {
                                 "reader" -> BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                                    val horizontal = maxWidth >= 700.dp
+                                    val horizontal = when (workspace.splitOrientation) { SplitOrientation.Horizontal -> true; SplitOrientation.Vertical -> false; SplitOrientation.Auto -> maxWidth >= 700.dp }
                                     val available = (if (horizontal) maxWidth else maxHeight).value - 48f
                                     val paneContent: @Composable (Int) -> Unit = { pane -> if (pane == 0) pane0() else pane1() }
-                                    if (!workspace.split || (imeVisible && !horizontal)) paneContent(if (workspace.split) workspace.activePane else workspace.visiblePane)
+                                    if (!workspace.split || (imeVisible && maxWidth < 700.dp)) paneContent(if (workspace.split) workspace.activePane else workspace.visiblePane)
                                     else SplitWorkspace(workspace, vm, horizontal, available, paneContent)
                                 }
                                 "notes" -> NotesScreen(data, vm, notesFolder, { notesFolder = it }, { if (wide) vm.layout(sidebarVisible = true) else drawer = true }, export)
@@ -190,9 +241,19 @@ import org.readerka.data.*
             }
             if (layoutOpen) AlertDialog(onDismissRequest = { layoutOpen = false }, title = { Text("Рабочее пространство") }, text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) { Text("Две области", Modifier.weight(1f)); Switch(workspace.split, { vm.layout(split = it); vm.navigate("reader") }) }
+                    Text("Расположение областей", style = MaterialTheme.typography.labelLarge)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LayoutChoice(Outline.Single, "Одна область", !workspace.split, "layout-single") { vm.maximizePane(workspace.activePane); vm.navigate("reader") }
+                        LayoutChoice(Outline.Split, "Рядом", workspace.split && workspace.splitOrientation == SplitOrientation.Horizontal, "layout-horizontal") { vm.layout(split = true, orientation = SplitOrientation.Horizontal); vm.navigate("reader") }
+                        LayoutChoice(Outline.SplitVertical, "Друг над другом", workspace.split && workspace.splitOrientation == SplitOrientation.Vertical, "layout-vertical") { vm.layout(split = true, orientation = SplitOrientation.Vertical); vm.navigate("reader") }
+                    }
+                    TextButton(onClick = { vm.layout(split = true, orientation = SplitOrientation.Auto); vm.navigate("reader") }) { Text("Автоматически по размеру окна") }
+                    if (workspace.split) {
+                        TextButton(onClick = { vm.maximizePane(workspace.activePane); layoutOpen = false }) { Text("Развернуть активную область ${workspace.activePane + 1}") }
+                        TextButton(onClick = { vm.collapsePane(workspace.activePane); layoutOpen = false }) { Text("Свернуть активную область ${workspace.activePane + 1}") }
+                    } else TextButton(onClick = { vm.layout(split = true); layoutOpen = false }, modifier = Modifier.testTag("restore-split-${workspace.visiblePane}")) { Text("Восстановить две области") }
                     Text("Пропорции областей", style = MaterialTheme.typography.labelLarge)
-                    Row { listOf(.33f to "⅓ : ⅔", .5f to "½ : ½", .67f to "⅔ : ⅓").forEach { (value, label) -> TextButton(onClick = { vm.layout(fraction = value) }) { Text(label) } } }
+                    Row { listOf(.33f to "⅓ : ⅔", .5f to "½ : ½", .67f to "⅔ : ⅓").forEach { (value, label) -> LayoutProportion(value, label, workspace.splitFraction) { vm.layout(fraction = value) } } }
                     Slider(workspace.splitFraction, { vm.layout(fraction = it) }, valueRange = .3f.. .7f)
                     Text("Проводник · ${workspace.sidebarWidth.toInt()} dp")
                     Slider(workspace.sidebarWidth, { vm.layout(sidebarWidth = it) }, valueRange = 200f..400f)
@@ -213,19 +274,19 @@ import org.readerka.data.*
                     add(QuickCommand("help", "Справка", "F1") { helpOpen = true })
                     add(QuickCommand("new-note", "Создать заметку", "Ctrl+N") { vm.newNote(reader?.document?.id) })
                     add(QuickCommand("save-note", "Сохранить заметку", "Ctrl+S") { vm.saveEditor(selected?.documentId?.takeIf { selected.kind == WorkspaceKind.Note }) })
-                    add(QuickCommand("drafts", "Открыть черновики") { draftsOpen = true })
+                    add(QuickCommand("drafts", "Открыть черновики", AppShortcuts.keys("drafts")) { draftsOpen = true })
                     add(QuickCommand("library", "Открыть библиотеку") { vm.navigate("library") })
                     add(QuickCommand("notes", "Каталог заметок") { vm.navigate("notes") })
                     add(QuickCommand("settings", "Настройки") { vm.navigate("settings") })
-                    add(QuickCommand("layout", "Области и размеры") { layoutOpen = true })
-                    add(QuickCommand("sidebar", "Показать или скрыть проводник", "Ctrl+B") { toggleSidebar() })
+                    add(QuickCommand("layout", "Области и размеры", AppShortcuts.keys("layout")) { layoutOpen = true })
+                    add(QuickCommand("sidebar", "Показать или скрыть проводник", AppShortcuts.keys("sidebar")) { toggleSidebar() })
                     selected?.let { tab -> add(QuickCommand("right", "Открыть справа") { vm.openRight(tab) }); add(QuickCommand("pin", "Закрепить или открепить вкладку") { vm.pinTab(workspace.activePane, tab.id) }) }
                     if (reader != null) {
                         add(QuickCommand("pdf-search", "Поиск в PDF", "Ctrl+F") { vm.requestReaderTool(ReaderTool.Search) })
-                        add(QuickCommand("pdf-quotes", "Цитаты текущего PDF") { vm.requestReaderTool(ReaderTool.Quotes) })
-                        add(QuickCommand("pdf-bookmarks", "Закладки текущего PDF") { vm.requestReaderTool(ReaderTool.Bookmarks) })
-                        add(QuickCommand("pdf-consp", "Конспекты текущего PDF") { vm.requestReaderTool(ReaderTool.Consp) })
-                        add(QuickCommand("pdf-page", "Перейти к странице PDF") { vm.requestReaderTool(ReaderTool.Page) })
+                        add(QuickCommand("pdf-quotes", "Цитаты текущего PDF", AppShortcuts.keys("quotes")) { vm.requestReaderTool(ReaderTool.Quotes) })
+                        add(QuickCommand("pdf-bookmarks", "Закладки текущего PDF", AppShortcuts.keys("bookmarks")) { vm.requestReaderTool(ReaderTool.Bookmarks) })
+                        add(QuickCommand("pdf-consp", "Конспекты текущего PDF", AppShortcuts.keys("book-consp")) { vm.requestReaderTool(ReaderTool.Consp) })
+                        add(QuickCommand("pdf-page", "Перейти к странице PDF", AppShortcuts.keys("page")) { vm.requestReaderTool(ReaderTool.Page) })
                     }
                     workspace.drafts.forEach { draft -> add(QuickCommand("draft-${draft.entry.id}", draft.entry.title.ifBlank { "Без названия" }, "Черновик") { vm.resumeDraft(draft) }) }
                     data.entries.forEach { entry -> add(QuickCommand("note-${entry.id}", entry.title, "Заметка · ${entry.comment.take(100)}") { vm.openNote(entry) }) }
@@ -237,28 +298,20 @@ import org.readerka.data.*
     }
 }
 
-@Composable private fun WorkspacePaneContent(pane: Int, data: LibrarySnapshot, vm: LibraryViewModel, session: ReaderSession?, state: WorkspaceState, fullscreen: Boolean, onFullscreen: (Boolean) -> Unit, keys: Boolean) {
+@Composable private fun WorkspacePaneContent(pane: Int, data: LibrarySnapshot, vm: LibraryViewModel, session: ReaderSession?, state: WorkspaceState, keys: Boolean, focusRequester: FocusRequester) {
     val model = state.panes[pane]
     val tab = model.selected
     val active = state.activePane == pane
-    BoxWithConstraints(Modifier.fillMaxSize().testTag("workspace-pane-$pane").onFocusChanged { if (it.hasFocus) vm.focusPane(pane) }.focusGroup().pointerInput(pane) {
+    BoxWithConstraints(Modifier.fillMaxSize().testTag("workspace-pane-$pane").focusRequester(focusRequester).onFocusChanged { if (it.hasFocus) vm.focusPane(pane) }.focusGroup().pointerInput(pane) {
         awaitPointerEventScope { while (true) { val event = awaitPointerEvent(PointerEventPass.Initial); if (event.changes.any { it.pressed && !it.previousPressed }) vm.focusPane(pane) } }
     }) {
         val wide = maxWidth >= 820.dp
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Область ${pane + 1}", Modifier.weight(1f).padding(start = 8.dp), style = MaterialTheme.typography.labelSmall)
-                if (vm.canReturnToNote.collectAsState().value) WorkspaceAction(Outline.Left, "Вернуться в конспект", vm::returnToNote, Modifier.testTag("return-to-note-$pane"))
-                if (state.split) {
-                    WorkspaceAction(Outline.Preview, "Развернуть эту область", { vm.maximizePane(pane) }, Modifier.testTag("maximize-pane-$pane"))
-                    WorkspaceAction(Outline.Close, "Свернуть область", { vm.collapsePane(pane) }, Modifier.testTag("collapse-pane-$pane"))
-                } else WorkspaceAction(Outline.Split, "Восстановить две области", { vm.layout(split = true) }, Modifier.testTag("restore-split-$pane"))
-                WorkspaceAction(Outline.Fullscreen, if (fullscreen) "Выйти из полного экрана" else "Полный экран", { onFullscreen(!fullscreen) }, Modifier.testTag("pane-fullscreen-$pane"))
-            }
+            if (vm.canReturnToNote.collectAsState().value) TextButton(onClick = vm::returnToNote, modifier = Modifier.testTag("return-to-note-$pane")) { Icon(Outline.Left, null); Text("Вернуться в конспект") }
             WorkspaceTabs(model, pane, data, state.drafts, active, vm)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab?.kind) {
-                    WorkspaceKind.Pdf -> if (session?.tabId == tab.id) ReaderScreen(session, data, vm, wide, fullscreen, onFullscreen, allowPageKeys = keys && active) else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    WorkspaceKind.Pdf -> if (session?.tabId == tab.id) ReaderScreen(session, data, vm, wide, allowPageKeys = keys && active) else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     WorkspaceKind.Note -> key(tab.id) { NoteDocument(tab.documentId, data, vm, pane) }
                     null -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Text("Область ${pane + 1}", style = MaterialTheme.typography.titleMedium); TextButton(onClick = { vm.focusPane(pane); vm.navigate("library") }) { Text("Открыть PDF") }; TextButton(onClick = { vm.focusPane(pane); vm.newNote() }) { Text("Создать заметку") }; TextButton(onClick = { vm.focusPane(pane); vm.newConsp(title = "Новый конспект") }) { Text("Создать конспект") } }
                 }
@@ -281,6 +334,10 @@ import org.readerka.data.*
     Box(Modifier.fillMaxSize()) {
         if (horizontal) Row(Modifier.fillMaxSize()) { Box(Modifier.weight(rendered).fillMaxHeight().clipToBounds()) { content(0) }; handle(); Box(Modifier.weight(1f - rendered).fillMaxHeight().clipToBounds()) { content(1) } }
         else Column(Modifier.fillMaxSize()) { Box(Modifier.weight(rendered).fillMaxWidth().clipToBounds()) { content(0) }; handle(); Box(Modifier.weight(1f - rendered).fillMaxWidth().clipToBounds()) { content(1) } }
+        if (dragging && (fraction <= .12f || fraction >= .88f)) {
+            val shade = Modifier.fillMaxHeight().fillMaxWidth(if (fraction <= .12f) rendered else 1f - rendered).align(if (fraction <= .12f) Alignment.CenterStart else Alignment.CenterEnd)
+            Box((if (horizontal) shade else Modifier.fillMaxWidth().fillMaxHeight(if (fraction <= .12f) rendered else 1f - rendered).align(if (fraction <= .12f) Alignment.TopCenter else Alignment.BottomCenter)).background(MaterialTheme.colorScheme.scrim.copy(alpha = .25f)))
+        }
         if (dragging && (fraction <= .12f || fraction >= .88f)) Surface(Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small) { Text("Отпустите, чтобы свернуть область ${if (fraction <= .12f) 1 else 2}", Modifier.padding(12.dp)) }
     }
 }

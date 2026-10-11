@@ -1,5 +1,6 @@
 package org.readerka.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,6 +15,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -38,6 +43,11 @@ object Outline {
         strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round).build()
     val File = glyph("PDF", "M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,12 H16 M9,16 H15")
     val Note = glyph("Заметка", "M5,3 H19 V21 H5 Z M8,8 H16 M8,12 H16 M8,16 H13")
+    val Consp = glyph("Конспект", "M5,3 H19 V21 H5 Z M8,7 H16 M8,11 H11 M8,14 H16 M8,17 H14")
+    val Quote = glyph("Цитата", "M4,6 H10 V12 H6 Q6,16 4,17 M14,6 H20 V12 H16 Q16,16 14,17")
+    val Link = glyph("Ссылка", "M10,8 L12,6 Q18,0 22,6 Q24,10 18,14 L16,16 M8,8 L6,10 Q0,14 3,19 Q6,24 11,19 L14,16 M8,16 L16,8")
+    val SplitVertical = glyph("Области друг над другом", "M3,4 H21 V20 H3 Z M3,12 H21")
+    val Single = glyph("Одна область", "M3,4 H21 V20 H3 Z")
     val Book = glyph("Чтение", "M3,5 Q7,3 12,6 Q17,3 21,5 V20 Q17,18 12,21 Q7,18 3,20 Z M12,6 V21")
     val Folder = glyph("Папка", "M3,7 V20 H21 V7 H12 L10,4 H3 Z")
     val Search = glyph("Поиск", "M16,10 A6,6 0,1 1,4 10 A6,6 0,1 1,16 10 M15,15 L21,21")
@@ -99,4 +109,27 @@ object Outline {
         Box((if (vertical) Modifier.width(1.dp).fillMaxHeight() else Modifier.height(1.dp).fillMaxWidth()).background(MaterialTheme.colorScheme.outlineVariant))
         Box((if (vertical) Modifier.size(4.dp, 28.dp) else Modifier.size(28.dp, 4.dp)).background(MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp)))
     }
+}
+
+@Composable fun NavigationAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, selected: Boolean = false) {
+    TextButton(onClick, modifier.heightIn(min = 64.dp).widthIn(min = 72.dp).semantics { this.selected = selected }.onPreviewKeyEvent { event ->
+        if (event.key in listOf(Key.Enter, Key.NumPadEnter, Key.Spacebar)) { if (event.type == KeyEventType.KeyDown) onClick(); true } else false
+    }, colors = ButtonDefaults.textButtonColors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent), contentPadding = PaddingValues(4.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, Modifier.size(20.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, maxLines = 2)
+        }
+    }
+}
+@Composable fun LayoutChoice(icon: ImageVector, label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
+    FilterChip(selected, onClick, label = { Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, Modifier.size(32.dp)); Text(label) } }, modifier = Modifier.heightIn(min = 64.dp).testTag(tag))
+}
+@Composable fun LayoutProportion(fraction: Float, label: String, current: Float, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    FilterChip(kotlin.math.abs(current - fraction) < .02f, onClick, label = {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Canvas(Modifier.size(60.dp, 28.dp)) { drawRect(accent, style = Stroke(1.5.dp.toPx())); drawLine(accent, Offset(size.width * fraction, 0f), Offset(size.width * fraction, size.height), strokeWidth = 1.5.dp.toPx()) }
+            Text(label)
+        }
+    }, modifier = Modifier.padding(end = 6.dp).heightIn(min = 64.dp))
 }

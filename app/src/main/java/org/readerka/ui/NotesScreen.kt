@@ -92,7 +92,7 @@ import java.util.UUID
             }
             if (entries.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(if (data.entries.isEmpty()) R.string.empty_notes else R.string.no_search_results)) }
             else LazyColumn(Modifier.weight(1f)) {
-                items(entries, key = { it.id }) { e -> EntryCard(e, data, { vm.openNote(e) }, { vm.source(e) }, e.id in selected, { selectedList = if (e.id in selected) selectedList - e.id else selectedList + e.id }, compact = compactRows, onRight = { vm.openRight(WorkspaceTab(e.id, e.id, WorkspaceKind.Note)) }) }
+                items(entries, key = { it.id }) { e -> EntryCard(e, data, { vm.openNote(e) }, { vm.source(e) }, if (selected.isEmpty()) null else e.id in selected, { selectedList = if (e.id in selected) selectedList - e.id else selectedList + e.id }, compact = compactRows, onRight = { vm.openRight(WorkspaceTab(e.id, e.id, WorkspaceKind.Note)) }) }
             }
         }
     }

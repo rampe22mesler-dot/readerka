@@ -1,0 +1,273 @@
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ConspWorkflowTest:
+INSTRUMENTATION_STATUS: test=mouseEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=mouseEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=repeatedQuotesReuseOneConspAndSourcesCanBeDetached
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=repeatedQuotesReuseOneConspAndSourcesCanBeDetached
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=keyboardEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=keyboardEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=fullscreenLastTabCloseCollapsesAndTouchBoundaryCanHidePane
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=fullscreenLastTabCloseCollapsesAndTouchBoundaryCanHidePane
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=editorShortcutsFormatNavigateAndPreserveNativeCopyPaste
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=editorShortcutsFormatNavigateAndPreserveNativeCopyPaste
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=touchOnlyEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=touchOnlyEditorSourcesAndLibraryInsertion
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=everyShortcutIsUnambiguousAndListedInHelp
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=everyShortcutIsUnambiguousAndListedInHelp
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=narrowSplitKeepsNativeCaretAndSaveAboveRealIme
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=narrowSplitKeepsNativeCaretAndSaveAboveRealIme
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=pdfShortcutsAndVisualLayoutsSurviveRecreation
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ConspWorkflowTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stack=java.lang.SecurityException: Injecting to another application requires INJECT_EVENTS permission
+	at android.os.Parcel.createException(Parcel.java:1942)
+	at android.os.Parcel.readException(Parcel.java:1910)
+	at android.os.Parcel.readException(Parcel.java:1860)
+	at android.hardware.input.IInputManager$Stub$Proxy.injectInputEvent(IInputManager.java:575)
+	at android.hardware.input.InputManager.injectInputEvent(InputManager.java:880)
+	at android.app.Instrumentation.sendKeySync(Instrumentation.java:1038)
+	at org.readerka.ConspWorkflowTest.key(ConspWorkflowTest.kt:49)
+	at org.readerka.ConspWorkflowTest.pdfShortcutsAndVisualLayoutsSurviveRecreation$lambda$101(ConspWorkflowTest.kt:260)
+	at org.readerka.ConspWorkflowTest.$r8$lambda$-FMWzDoBG0ZSE-Z0IHkWU4EXOb8(Unknown Source:0)
+	at org.readerka.ConspWorkflowTest$$ExternalSyntheticLambda84.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ConspWorkflowTest.fixture(ConspWorkflowTest.kt:75)
+	at org.readerka.ConspWorkflowTest.pdfShortcutsAndVisualLayoutsSurviveRecreation(ConspWorkflowTest.kt:237)
+	... 53 trimmed
+Caused by: android.os.RemoteException: Remote stack trace:
+	at com.android.server.input.InputManagerService.injectInputEventInternal(InputManagerService.java:621)
+	at com.android.server.input.InputManagerService.injectInputEvent(InputManagerService.java:595)
+	at android.hardware.input.IInputManager$Stub.onTransact(IInputManager.java:143)
+	at android.os.Binder.execTransact(Binder.java:731)
+
+
+INSTRUMENTATION_STATUS: stream=
+Error in pdfShortcutsAndVisualLayoutsSurviveRecreation(org.readerka.ConspWorkflowTest):
+java.lang.SecurityException: Injecting to another application requires INJECT_EVENTS permission
+	at android.os.Parcel.createException(Parcel.java:1942)
+	at android.os.Parcel.readException(Parcel.java:1910)
+	at android.os.Parcel.readException(Parcel.java:1860)
+	at android.hardware.input.IInputManager$Stub$Proxy.injectInputEvent(IInputManager.java:575)
+	at android.hardware.input.InputManager.injectInputEvent(InputManager.java:880)
+	at android.app.Instrumentation.sendKeySync(Instrumentation.java:1038)
+	at org.readerka.ConspWorkflowTest.key(ConspWorkflowTest.kt:49)
+	at org.readerka.ConspWorkflowTest.pdfShortcutsAndVisualLayoutsSurviveRecreation$lambda$101(ConspWorkflowTest.kt:260)
+	at org.readerka.ConspWorkflowTest.$r8$lambda$-FMWzDoBG0ZSE-Z0IHkWU4EXOb8(Unknown Source:0)
+	at org.readerka.ConspWorkflowTest$$ExternalSyntheticLambda84.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ConspWorkflowTest.fixture(ConspWorkflowTest.kt:75)
+	at org.readerka.ConspWorkflowTest.pdfShortcutsAndVisualLayoutsSurviveRecreation(ConspWorkflowTest.kt:237)
+	... 53 trimmed
+Caused by: android.os.RemoteException: Remote stack trace:
+	at com.android.server.input.InputManagerService.injectInputEventInternal(InputManagerService.java:621)
+	at com.android.server.input.InputManagerService.injectInputEvent(InputManagerService.java:595)
+	at android.hardware.input.IInputManager$Stub.onTransact(IInputManager.java:143)
+	at android.os.Binder.execTransact(Binder.java:731)
+
+
+INSTRUMENTATION_STATUS: test=pdfShortcutsAndVisualLayoutsSurviveRecreation
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.readerka.ReaderControlsTest:
+INSTRUMENTATION_STATUS: test=keyboardAndCenterTapSliderNavigateAndScrolledPagesKeepTheirImages
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=keyboardAndCenterTapSliderNavigateAndScrolledPagesKeepTheirImages
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=documentFoldersAndNestedBookmarksAreAvailableDuringReading
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=documentFoldersAndNestedBookmarksAreAvailableDuringReading
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=tapSavedHighlightDeleteItAndTranslateRealSelection
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.ReaderControlsTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=tapSavedHighlightDeleteItAndTranslateRealSelection
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+org.readerka.WorkspaceRecoveryTest:
+INSTRUMENTATION_STATUS: test=typingWhileManualSaveWaitsForDatabaseRetainsTheNewerDraft
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=typingWhileManualSaveWaitsForDatabaseRetainsTheNewerDraft
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=org.readerka.WorkspaceRecoveryTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=14
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=durableDraftRecoversInFreshViewModelAndSavesOneCanonicalEntryWithBothFolders
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 511.996
+There was 1 failure:
+1) pdfShortcutsAndVisualLayoutsSurviveRecreation(org.readerka.ConspWorkflowTest)
+java.lang.SecurityException: Injecting to another application requires INJECT_EVENTS permission
+	at android.os.Parcel.createException(Parcel.java:1942)
+	at android.os.Parcel.readException(Parcel.java:1910)
+	at android.os.Parcel.readException(Parcel.java:1860)
+	at android.hardware.input.IInputManager$Stub$Proxy.injectInputEvent(IInputManager.java:575)
+	at android.hardware.input.InputManager.injectInputEvent(InputManager.java:880)
+	at android.app.Instrumentation.sendKeySync(Instrumentation.java:1038)
+	at org.readerka.ConspWorkflowTest.key(ConspWorkflowTest.kt:49)
+	at org.readerka.ConspWorkflowTest.pdfShortcutsAndVisualLayoutsSurviveRecreation$lambda$101(ConspWorkflowTest.kt:260)
+	at org.readerka.ConspWorkflowTest.$r8$lambda$-FMWzDoBG0ZSE-Z0IHkWU4EXOb8(Unknown Source:0)
+	at org.readerka.ConspWorkflowTest$$ExternalSyntheticLambda84.invoke(D8$$SyntheticClass:0)
+	at org.readerka.ConspWorkflowTest.fixture(ConspWorkflowTest.kt:75)
+	at org.readerka.ConspWorkflowTest.pdfShortcutsAndVisualLayoutsSurviveRecreation(ConspWorkflowTest.kt:237)
+	... 53 trimmed
+Caused by: android.os.RemoteException: Remote stack trace:
+	at com.android.server.input.InputManagerService.injectInputEventInternal(InputManagerService.java:621)
+	at com.android.server.input.InputManagerService.injectInputEvent(InputManagerService.java:595)
+	at android.hardware.input.IInputManager$Stub.onTransact(IInputManager.java:143)
+	at android.os.Binder.execTransact(Binder.java:731)
+
+
+FAILURES!!!
+Tests run: 14,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1
