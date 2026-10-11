@@ -504,15 +504,49 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
         drafts.forEach { autoSaves.remove(it.entry.id)?.cancel() }
         entryWriteLock.withLock { val data = repository.dao.snapshot(); drafts.forEach { repository.saveEntry(it.entry, it.tags, it.collections.intersect(data.collections.map { it.id }.toSet()), it.readerFolders.intersect(data.readerFolders.map { it.id }.toSet())) } }
     }
+    private val _importReview = MutableStateFlow<StagedBackup?>(null)
+    val importReview = _importReview.asStateFlow()
     fun restore(uri: Uri) = perform(R.string.restoring) {
-        flushConspDrafts()
-        val before = repository.dao.snapshot()
-        before.entries.filter { it.kind == EntryKind.Consp }.forEach { repository.checkpoint(it, "До восстановления резервной копии") }
-        withContext(Dispatchers.IO) {
-            val staged = context().contentResolver.openInputStream(uri)?.use { BackupArchive.stage(it, File(context().cacheDir, "restore-${UUID.randomUUID()}")) } ?: error("Cannot open backup")
-            RestoreService(repository).restore(staged)
+        require(_importReview.value == null)
+        _importReview.value = withContext(Dispatchers.IO) {
+            context().contentResolver.openInputStream(uri)?.use { BackupArchive.stage(it, File(context().cacheDir, "restore-${UUID.randomUUID()}")) } ?: error("Cannot open backup")
         }
-        message(R.string.restore_done)
     }
-    override fun onCleared() { opening.values.forEach { it.cancel() }; _readers.value.values.forEach { session -> CoroutineScope(Dispatchers.IO).launch { session.engine.close() } }; super.onCleared() }
+    fun cancelRestore() { val staged = _importReview.value; _importReview.value = null; staged?.directory?.deleteRecursively() }
+    fun automaticBackups(): List<File> = File(repository.pdfDirectory.parentFile, "automatic-backups").listFiles()?.filter { it.extension == "zip" }?.sortedByDescending { it.lastModified() }.orEmpty()
+    fun reviewAutomaticBackup(file: File) = perform(R.string.restoring) {
+        require(file in automaticBackups())
+        cancelRestore()
+        _importReview.value = withContext(Dispatchers.IO) { file.inputStream().use { BackupArchive.stage(it, File(context().cacheDir, "restore-${UUID.randomUUID()}")) } }
+    }
+    fun confirmRestore(policy: ImportPolicy) = perform(R.string.restoring) {
+        val staged = _importReview.value ?: return@perform
+        _importReview.value = null
+        autoSaves.values.forEach { it.cancel() }; autoSaves.clear()
+        entryWriteLock.withLock {
+            val previousReaders=_readers.value
+            var readersClosed=false
+            try {
+                // Preserve all open edits before the automatic backup and chosen import policy.
+                _workspace.value.drafts.forEach { draft -> require(draft.entry.title.isNotBlank()) { "Сначала укажите названия черновиков" }; repository.saveEntry(draft.entry, draft.tags, draft.collections, draft.readerFolders) }
+                LibraryMerge.merge(repository.dao.snapshot(),staged.data,policy)
+                opening.values.forEach { it.cancel() }; opening.clear()
+                _readers.value=emptyMap();_reader.value=null;readersClosed=true
+                withContext(Dispatchers.IO) {
+                    previousReaders.values.forEach { it.engine.close() }
+                    RestoreService(repository).restore(staged, policy)
+                }
+                _readers.value = emptyMap(); _reader.value = null
+                _workspace.value = WorkspaceState(); workspaceStore.save(_workspace.value)
+                savedState["open-documents"]=arrayListOf<String>()
+                navigate("library")
+                message(R.string.restore_done)
+            } catch (e: Exception) {
+                staged.directory.deleteRecursively()
+                if(readersClosed)previousReaders.forEach{(pane,session)->open(session.document,session.anchor,session.page,navigate=false,recordHistory=false,pane=pane,tabId=session.tabId,offset=session.offset)}
+                throw e
+            }
+        }
+    }
+    override fun onCleared() { _importReview.value?.directory?.deleteRecursively(); opening.values.forEach { it.cancel() }; _readers.value.values.forEach { session -> CoroutineScope(Dispatchers.IO).launch { session.engine.close() } }; super.onCleared() }
 }

@@ -6,6 +6,45 @@ import java.io.File
 import java.security.MessageDigest
 
 class RestoreService(private val repository: LibraryRepository) {
+    /** Explicit policy import: validate, back up, journal PDFs, and commit all Room rows together. */
+    suspend fun restore(staged: StagedBackup, policy: ImportPolicy): File {
+        val rollback = File(repository.pdfDirectory.parentFile, "restore-rollback-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+        val touched = mutableListOf<File>()
+        val backups = File(repository.pdfDirectory.parentFile, "automatic-backups").apply { mkdirs() }
+        val backup = File(backups, "before-import-${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}.zip")
+        try {
+            repository.database.withTransaction {
+                val current = repository.dao.snapshot()
+                val merged = LibraryMerge.merge(current, staged.data, policy)
+                val temporary = File(backups, backup.name + ".pending")
+                try { temporary.outputStream().use { BackupArchive.write(it, current, repository::pdfFile) }; require(temporary.renameTo(backup)) }
+                finally { temporary.delete() }
+                val existing = current.documents.map { it.id }.toSet()
+                staged.data.documents.filter { policy != ImportPolicy.KeepLocal || it.id !in existing }.forEach { d ->
+                    val target = repository.pdfFile(d)
+                    if (target.exists()) target.copyTo(File(rollback, target.name), overwrite = true)
+                    touched += target
+                    File(staged.directory, "pdfs/${d.storedName}").copyTo(target, overwrite = true)
+                }
+                val sql = repository.database.openHelper.writableDatabase
+                listOf("note_versions", "reader_memberships", "entry_tags", "document_tags", "memberships", "bookmarks", "entries", "reader_folders", "documents", "collections", "document_folders", "tags").forEach { table -> sql.execSQL("DELETE FROM $table") }
+                val dao = repository.dao
+                FolderTree.ordered(merged.documentFolders, { it.id }, { it.parentId }).forEach { dao.putFolder(it) }
+                FolderTree.ordered(merged.collections, { it.id }, { it.parentId }).forEach { dao.putCollection(it) }
+                merged.documents.forEach { dao.putDocument(it) }
+                FolderTree.ordered(merged.readerFolders, { it.id }, { it.parentId }).forEach { dao.putReaderFolder(it) }
+                merged.entries.forEach { dao.putEntry(it) }; merged.tags.forEach { dao.putTag(it) }
+                merged.memberships.forEach { dao.putMembership(it) }; merged.entryTags.forEach { dao.putEntryTag(it) }
+                merged.documentTags.forEach { dao.putDocumentTag(it) }; merged.readerMemberships.forEach { dao.putReaderMembership(it) }
+                FolderTree.ordered(merged.bookmarks, { it.id }, { it.parentId }).forEach { dao.putBookmark(it) }
+                merged.noteVersions.forEach { dao.putNoteVersion(it) }
+            }
+            return backup
+        } catch (e: Exception) {
+            touched.forEach { target -> val previous = File(rollback, target.name); if (previous.exists()) previous.copyTo(target, overwrite = true) else target.delete() }
+            throw e
+        } finally { rollback.deleteRecursively(); staged.directory.deleteRecursively() }
+    }
     /** Merge a verified snapshot. Conflicting IDs fail instead of overwriting current research. */
     suspend fun restore(staged: StagedBackup) {
         val createdFiles = mutableListOf<File>()

@@ -4,4 +4,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "Readerka"
-include(":app")
+include(":app", ":shared", ":desktop")

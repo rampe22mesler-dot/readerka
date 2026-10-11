@@ -1,0 +1,9 @@
+
+org.readerka.LibraryIntegrationTest:.
+org.readerka.ReaderMigrationTest:...
+org.readerka.PdfWorkflowTest:...
+org.readerka.ConspWorkflowTest:......
+
+Time: 362.531
+
+OK (13 tests)

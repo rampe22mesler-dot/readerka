@@ -14,10 +14,6 @@ import androidx.compose.ui.unit.dp
 import org.commonmark.node.*
 import org.commonmark.parser.Parser
 
-object MarkdownDocument {
-    private val parser = Parser.builder().build()
-    fun parse(source: String): Node = parser.parse(source)
-}
 private fun children(node: Node): List<Node> = buildList { var n = node.firstChild; while (n != null) { add(n); n = n.next } }
 
 @Composable fun MarkdownPreview(source: String, onLink: (String) -> Unit, modifier: Modifier = Modifier) {

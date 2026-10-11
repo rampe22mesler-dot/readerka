@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.VaultExporterTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.609Z" hostname="9ad4ae0172e4" time="0.029">
+  <properties/>
+  <testcase name="vaultHasCanonicalNotesCollectionEmbedsHierarchyAndActualPdfPages" classname="org.readerka.VaultExporterTest" time="0.009"/>
+  <testcase name="excludedOrMissingPdfNeverProducesDeadPdfLinks" classname="org.readerka.VaultExporterTest" time="0.011"/>
+  <testcase name="exportIsStableAndLeavesSnapshotUntouched" classname="org.readerka.VaultExporterTest" time="0.009"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

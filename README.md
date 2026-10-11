@@ -4,6 +4,16 @@
 
 Для библиотеки не нужны аккаунты, Google Play Services или сервер. Чтение, цитаты, закладки и экспорт работают офлайн. Только встроенное окно Google Переводчика использует интернет и отправляет выбранный для перевода текст Google. Библиотека при первом запуске пустая; все тематические папки создаёт пользователь.
 
+## Windows 10/11 x64 — 0.9.1 Desktop Preview
+
+[Скачать Windows ZIP](https://github.com/rampe22mesler-dot/readerka/blob/codex/readerka-desktop-windows/downloads/readerka-0.9.1-desktop-windows-x64.zip) · [Android 0.9.1 для обратного переноса](https://github.com/rampe22mesler-dot/readerka/blob/codex/readerka-desktop-windows/downloads/readerka-0.9.1-preview.apk) · [Инструкция](docs/WINDOWS.md) · [Проверки](docs/DESKTOP_VALIDATION.md)
+
+Распакуйте архив полностью и запустите **Readerka.cmd**: Java включена. На ПК можно настроить всю библиотеку, читать PDF, редактировать конспекты и переносить данные на планшет через совместимый ZIP. Конспекты используют отдельные папки; ссылки, выделения, закладки и версии сохраняются. **F1** открывает справку со всеми клавишами.
+
+Для обновления совпадающих записей на планшете установите Preview 0.9.1 поверх 0.9, не удаляя приложение: добавлены сравнение изменений, выбор способа импорта и автоматическая резервная копия. База Room остаётся версии 4. Настольная работа опубликована в отдельной ветке `codex/readerka-desktop-windows`; основа — 0.9 на базе 0.7.
+
+Для скачивания из закрытого репозитория войдите в GitHub с доступом и нажмите **Download raw file / View raw** на странице файла.
+
 ## Папки в каталоге 0.9.0 — Preview
 
 [Скачать Readerka 0.9.0 Preview — страница APK](https://github.com/rampe22mesler-dot/readerka/blob/main/downloads/readerka-0.9.0-preview.apk) · [Руководство](docs/CONSP_GUIDE.md) · [SHA-256](downloads/SHA256SUMS.txt)

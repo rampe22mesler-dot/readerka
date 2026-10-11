@@ -1,0 +1,22 @@
+> Task :desktop:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :shared:compileKotlin UP-TO-DATE
+> Task :shared:compileJava NO-SOURCE
+> Task :desktop:compileKotlin UP-TO-DATE
+> Task :desktop:compileJava NO-SOURCE
+> Task :desktop:processResources NO-SOURCE
+> Task :desktop:classes UP-TO-DATE
+> Task :desktop:jar UP-TO-DATE
+> Task :desktop:compileTestKotlin UP-TO-DATE
+> Task :desktop:compileTestJava NO-SOURCE
+> Task :desktop:processTestResources NO-SOURCE
+> Task :desktop:testClasses UP-TO-DATE
+> Task :shared:processResources NO-SOURCE
+> Task :shared:classes UP-TO-DATE
+> Task :shared:jar UP-TO-DATE
+
+> Task :desktop:verifyInterop
+Android -> desktop: identities, rich text, links, versions, folder scopes and PDF checksums verified
+
+BUILD SUCCESSFUL in 999ms
+6 actionable tasks: 1 executed, 5 up-to-date

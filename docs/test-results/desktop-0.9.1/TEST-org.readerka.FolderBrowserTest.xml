@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.FolderBrowserTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.539Z" hostname="9ad4ae0172e4" time="0.014">
+  <properties/>
+  <testcase name="largeTreeKeepsClosedBranchesOutOfVisibleList" classname="org.readerka.FolderBrowserTest" time="0.011"/>
+  <testcase name="collapseHidesWholeBranchAndSearchRevealsOnlyMatchingPaths" classname="org.readerka.FolderBrowserTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -202,7 +202,7 @@ import org.readerka.data.TextStyle
                 TextField(entry.title, { vm.updateDraft(draft.copy(entry = entry.copy(title = it))) }, enabled = !saving,
                     placeholder = { Text(if (entry.kind == EntryKind.Consp) "Название конспекта" else "Название заметки") }, textStyle = MaterialTheme.typography.headlineMedium,
                     colors = TextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth().focusRequester(titleFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "title") }.testTag("entry-title"))
-                if (entry.anchor != null) { Text("Исходная цитата · страница ${entry.anchor.page + 1}", style = MaterialTheme.typography.labelMedium); Text(entry.quote) }
+                if (entry.anchor != null) { Text("Исходная цитата · страница ${entry.anchor!!.page + 1}", style = MaterialTheme.typography.labelMedium); Text(entry.quote) }
                 if (find) Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(query, { query = it }, label = { Text("Найти в документе") }, modifier = Modifier.weight(1f))
                     TextButton(onClick = { val index = rich.text.indexOf(query, (selection.max + 1).coerceAtMost(rich.text.length), true).let { if (it < 0) rich.text.indexOf(query, ignoreCase = true) else it }; if (index >= 0 && query.isNotEmpty()) { selection = TextRange(index, index + query.length); nativeView?.requestFocus() } }) { Text("Далее") }

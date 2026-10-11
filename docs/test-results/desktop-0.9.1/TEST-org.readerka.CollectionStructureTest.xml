@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.CollectionStructureTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.440Z" hostname="9ad4ae0172e4" time="0.021">
+  <properties/>
+  <testcase name="directContentsSearchAndExplicitFlatViewHaveDifferentScopes" classname="org.readerka.CollectionStructureTest" time="0.007"/>
+  <testcase name="olderZipSeparatesFoldersAndNewZipPreservesBothTrees" classname="org.readerka.CollectionStructureTest" time="0.011"/>
+  <testcase name="legacyFoldersBecomeIndependentTreesWithoutDuplicatingEntries" classname="org.readerka.CollectionStructureTest" time="0.001"/>
+  <testcase name="backupsRejectCrossCatalogueParentsAndMemberships" classname="org.readerka.CollectionStructureTest" time="0.002"/>
+  <testcase name="legacyDraftsMapOnlyToAvailableOutlineFolders" classname="org.readerka.CollectionStructureTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

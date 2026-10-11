@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.WordSelectionTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.641Z" hostname="9ad4ae0172e4" time="0.007">
+  <properties/>
+  <testcase name="touchingAnyLetterSelectsWholeLatinOrCyrillicWordWithoutPunctuation" classname="org.readerka.WordSelectionTest" time="0.006"/>
+  <testcase name="ligatureGlyphAndCombiningMarksRemainInTheWholeWord" classname="org.readerka.WordSelectionTest" time="0.0"/>
+  <testcase name="punctuationTouchDoesNotAbsorbNeighboringWords" classname="org.readerka.WordSelectionTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.desktop.DesktopStorageTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:10.082Z" hostname="9ad4ae0172e4" time="0.327">
+  <properties/>
+  <testcase name="independentSameNamedTagsConvergeWithoutDuplicateEntries" classname="org.readerka.desktop.DesktopStorageTest" time="0.034"/>
+  <testcase name="renamedTagConflictRespectsChosenIdentity" classname="org.readerka.desktop.DesktopStorageTest" time="0.001"/>
+  <testcase name="importBackupPreservesPreviousStateAndIncomingReplacesRelations" classname="org.readerka.desktop.DesktopStorageTest" time="0.231"/>
+  <testcase name="draftsSurviveCloseAndSavedFormattingReturnsThroughZip" classname="org.readerka.desktop.DesktopStorageTest" time="0.034"/>
+  <testcase name="replacementIsExplicitAndKeepLocalDoesNotLoseEdits" classname="org.readerka.desktop.DesktopStorageTest" time="0.001"/>
+  <testcase name="interruptedPdfImportRecoversPreviousBytesOnNextLaunch" classname="org.readerka.desktop.DesktopStorageTest" time="0.006"/>
+  <testcase name="completedPdfTransactionDoesNotRollBackAfterRestart" classname="org.readerka.desktop.DesktopStorageTest" time="0.004"/>
+  <testcase name="selectedWordLinkAndContentHaveDifferentSemantics" classname="org.readerka.desktop.DesktopStorageTest" time="0.003"/>
+  <testcase name="invalidMixedScopesNeverModifyTheLibrary" classname="org.readerka.desktop.DesktopStorageTest" time="0.006"/>
+  <testcase name="multipleCommittedJournalsNeverRestoreOlderPdfBytes" classname="org.readerka.desktop.DesktopStorageTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

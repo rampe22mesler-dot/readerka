@@ -36,6 +36,7 @@ import org.readerka.MainActivity
 import org.readerka.data.*
 
 @Composable fun ReaderkaRoot(activity: Activity, vm: LibraryViewModel) {
+    val importReview by vm.importReview.collectAsStateWithLifecycle()
     val data by vm.library.collectAsStateWithLifecycle()
     val preferences by vm.preferences.collectAsStateWithLifecycle()
     val screen by vm.screen.collectAsStateWithLifecycle()
@@ -129,6 +130,9 @@ import org.readerka.data.*
     val density = LocalDensity.current
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * preferences.scale), LocalCompact provides preferences.compact) {
       MaterialTheme(colorScheme = colors, shapes = Shapes(small = androidx.compose.foundation.shape.RoundedCornerShape(6.dp), medium = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), large = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))) {
+    importReview?.let { staged ->
+        ImportReviewDialog(staged, data, vm::cancelRestore, vm::confirmRestore)
+    }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
             val windowWidth = maxWidth

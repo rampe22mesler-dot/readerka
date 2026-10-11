@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.ConspModelTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.465Z" hostname="9ad4ae0172e4" time="0.073">
+  <properties/>
+  <testcase name="insertionBeforeFirstParagraphDoesNotMoveItsIdentityToTheNewParagraph" classname="org.readerka.ConspModelTest" time="0.004"/>
+  <testcase name="legacyNotesAndQuotesKeepTheirIdentityAndAreNotConverted" classname="org.readerka.ConspModelTest" time="0.0"/>
+  <testcase name="paragraphTargetsStayStableWhenHeadingIsRenamedOrMovedByInsertion" classname="org.readerka.ConspModelTest" time="0.001"/>
+  <testcase name="standaloneMarkdownExportResolvesEntryAndParagraphLinks" classname="org.readerka.ConspModelTest" time="0.016"/>
+  <testcase name="reassigningTheSameLinkKeepsItInsteadOfTogglingItOff" classname="org.readerka.ConspModelTest" time="0.0"/>
+  <testcase name="backlinksUseIdentityEvenAfterRenamingAndIncludeCardsAndFragments" classname="org.readerka.ConspModelTest" time="0.003"/>
+  <testcase name="multiBookConspIsOneCanonicalEntryInAllFilters" classname="org.readerka.ConspModelTest" time="0.0"/>
+  <testcase name="quotationInsertionUsesOriginalTextAndCanIncludeFormattedComment" classname="org.readerka.ConspModelTest" time="0.024"/>
+  <testcase name="selectionFormattingCanBeRemovedWithoutDestroyingOtherRanges" classname="org.readerka.ConspModelTest" time="0.002"/>
+  <testcase name="legacyParagraphLinksAreStableUntilAndAfterVisualEditing" classname="org.readerka.ConspModelTest" time="0.002"/>
+  <testcase name="backupPreservesRichContentSourcesMembershipsAndHistoricalDrafts" classname="org.readerka.ConspModelTest" time="0.015"/>
+  <testcase name="invalidRichRangesAndMissingSourceBooksAreRejected" classname="org.readerka.ConspModelTest" time="0.001"/>
+  <testcase name="visualFormatsAndLinksSurviveSerializationAndMarkdownRoundTrip" classname="org.readerka.ConspModelTest" time="0.002"/>
+  <testcase name="linkCardHasItsOwnBlockAndCopiedFragmentKeepsFormatWithFreshIdentities" classname="org.readerka.ConspModelTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

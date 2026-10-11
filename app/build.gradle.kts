@@ -14,8 +14,8 @@ android {
         manifestPlaceholders["readerkaLabel"] = if (preview) "Readerka Preview" else "Readerka"
         minSdk = 28
         targetSdk = 35
-        versionCode = 9
-        versionName = if (preview) "0.9.0-preview" else "0.9.0"
+        versionCode = 10
+        versionName = if (preview) "0.9.1-preview" else "0.9.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
@@ -27,9 +27,11 @@ android {
     packaging { resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/*.version") }
     testOptions { unitTests.isIncludeAndroidResources = true }
     sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    sourceSets.getByName("androidTest").assets.srcDir("${rootProject.projectDir}/desktop/build/interop")
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 dependencies {
+    implementation(project(":shared"))
     implementation(platform("androidx.compose:compose-bom:2025.04.00"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3")
@@ -53,3 +55,5 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach { dependsOn(":desktop:interopFixture") }

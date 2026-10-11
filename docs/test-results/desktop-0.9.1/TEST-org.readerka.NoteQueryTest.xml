@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.NoteQueryTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.554Z" hostname="9ad4ae0172e4" time="0.003">
+  <properties/>
+  <testcase name="parentFolderIncludesDescendantsWithoutDuplicatingMultiAssignedQuote" classname="org.readerka.NoteQueryTest" time="0.001"/>
+  <testcase name="unicodeSearchAndCombinedFiltersFindCanonicalEntryOnlyOnce" classname="org.readerka.NoteQueryTest" time="0.001"/>
+  <testcase name="changingMembershipDoesNotCopyOrDestroyEntry" classname="org.readerka.NoteQueryTest" time="0.0"/>
+  <testcase name="cyclicParentChangeIsRejected" classname="org.readerka.NoteQueryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

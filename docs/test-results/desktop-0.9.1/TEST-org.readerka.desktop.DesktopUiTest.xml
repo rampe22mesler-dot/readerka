@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.desktop.DesktopUiTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:10.415Z" hostname="9ad4ae0172e4" time="27.014">
+  <properties/>
+  <testcase name="keyboardSelectsPdfTextAndCreatesAnchoredQuote" classname="org.readerka.desktop.DesktopUiTest" time="6.757"/>
+  <testcase name="boldAtCaretAppliesToNewTypingAndReadingOutlineCanFold" classname="org.readerka.desktop.DesktopUiTest" time="0.308"/>
+  <testcase name="internalClipboardKeepsFormattingAndLinks" classname="org.readerka.desktop.DesktopUiTest" time="0.012"/>
+  <testcase name="nativeTypingUndoAndCopyDoNotReplaceStableBlocks" classname="org.readerka.desktop.DesktopUiTest" time="0.055"/>
+  <testcase name="keyboardFormattingFoldersRightPaneFullscreenAndDraftRecovery" classname="org.readerka.desktop.DesktopUiTest" time="0.425"/>
+  <testcase name="mouseSelectsPdfQuoteAndOpensEditor" classname="org.readerka.desktop.DesktopUiTest" time="19.457"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Oct 11, 2026 7:52:10 AM org.apache.pdfbox.pdmodel.font.PDType1Font <init>
+WARNING: Using fallback font LiberationSans for base font Symbol
+]]></system-err>
+</testsuite>

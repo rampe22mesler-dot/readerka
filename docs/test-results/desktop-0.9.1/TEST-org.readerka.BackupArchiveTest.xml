@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.readerka.BackupArchiveTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-11T07:52:09.325Z" hostname="9ad4ae0172e4" time="0.106">
+  <properties/>
+  <testcase name="invalidArchivesAreRejectedWithoutLeavingStagedData" classname="org.readerka.BackupArchiveTest" time="0.061"/>
+  <testcase name="backupRoundTripPreservesAllRelationshipsAndPdfBytes" classname="org.readerka.BackupArchiveTest" time="0.043"/>
+  <testcase name="orphanReferencesAndFolderCyclesCannotEnterBackup" classname="org.readerka.BackupArchiveTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

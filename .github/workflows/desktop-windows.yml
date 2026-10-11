@@ -1,0 +1,41 @@
+name: Readerka Windows desktop
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/readerka-desktop-windows]
+    paths: ['desktop/**', 'shared/**', 'scripts/*windows*', '*.gradle.kts', '.github/workflows/desktop-windows.yml']
+  pull_request:
+    paths: ['desktop/**', 'shared/**', 'scripts/*windows*', '*.gradle.kts', '.github/workflows/desktop-windows.yml']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test shared core and desktop on Windows
+        shell: bash
+        run: ./gradlew :shared:test :desktop:test --configure-on-demand --max-workers=2
+      - name: Package Windows portable application
+        shell: bash
+        run: bash scripts/build-windows.sh
+        env:
+          READERKA_DESKTOP_TOOLCHAINS: ${{ runner.temp }}/readerka-desktop-toolchains
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: readerka-windows-results
+          path: |
+            shared/build/test-results/test/*.xml
+            desktop/build/test-results/test/*.xml
+            desktop/build/screenshots/*.png
+            downloads/readerka-0.9.1-desktop-windows-x64.zip
+            downloads/readerka-0.9.1-desktop-windows-x64.zip.sha256

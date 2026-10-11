@@ -43,6 +43,16 @@ import org.readerka.export.*
         TextButton(onClick = { onExport(ExportKind.Backup, null) }) { Text(stringResource(R.string.backup)) }
         Text(stringResource(R.string.restore_explanation), modifier = Modifier.widthIn(max = 650.dp))
         TextButton(onClick = onRestore) { Text(stringResource(R.string.restore)) }
+        var backupsOpen by remember { mutableStateOf(false) }
+        TextButton(onClick = { backupsOpen = true }) { Text("Автоматические резервные копии перед переносом") }
+        if (backupsOpen) AlertDialog(onDismissRequest = { backupsOpen = false }, title = { Text("Резервные копии") }, text = {
+            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                val backups = vm.automaticBackups()
+                if (backups.isEmpty()) Text("Резервных копий пока нет")
+                backups.forEach { file -> TextButton(onClick = { backupsOpen = false; vm.reviewAutomaticBackup(file) }) { Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(file.lastModified()))) } }
+            }
+        }, confirmButton = { TextButton(onClick = { backupsOpen = false }) { Text("Закрыть") } })
+
         HorizontalDivider()
         Text(stringResource(R.string.keyboard_shortcuts), style = MaterialTheme.typography.bodySmall)
         Text(stringResource(R.string.offline_notice), style = MaterialTheme.typography.bodySmall)
