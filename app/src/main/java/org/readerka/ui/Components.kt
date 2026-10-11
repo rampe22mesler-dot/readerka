@@ -122,7 +122,7 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }
 
-@Composable fun EntryCard(entry: Entry, data: LibrarySnapshot, onEdit: () -> Unit, onSource: () -> Unit, selected: Boolean? = null, onSelect: (() -> Unit)? = null, compact: Boolean = false, onRight: (() -> Unit)? = null, onDelete: (() -> Unit)? = null) {
+@Composable fun EntryCard(entry: Entry, data: LibrarySnapshot, onEdit: () -> Unit, onSource: () -> Unit, selected: Boolean? = null, onSelect: (() -> Unit)? = null, compact: Boolean = false, onRight: (() -> Unit)? = null) {
     val document = data.documents.firstOrNull { it.id == entry.documentId }
     val tagNames = data.entryTags.filter { it.entryId == entry.id }.mapNotNull { a -> data.tags.firstOrNull { it.id == a.tagId }?.name }
     val folderNames = data.memberships.filter { it.entryId == entry.id }.mapNotNull { m -> data.collections.firstOrNull { it.id == m.collectionId }?.name }
@@ -132,7 +132,6 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
             Box(Modifier.width(3.dp).heightIn(min = if (compact) 72.dp else 110.dp).background(Color(entry.color.argb)))
             Column(Modifier.weight(1f).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(when (entry.kind) { EntryKind.Quote -> Outline.Quote; EntryKind.Consp -> Outline.Consp; EntryKind.Note -> Outline.Edit }, null, Modifier.padding(end = 8.dp).size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     Text(entry.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Box {
                         WorkspaceAction(Outline.More, "Действия записи", { menu = true })
@@ -140,11 +139,10 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
                             DropdownMenuItem(text = { Text("Открыть запись") }, onClick = { menu = false; onEdit() })
                             if (onRight != null) DropdownMenuItem(text = { Text("Открыть справа") }, onClick = { menu = false; onRight() })
                             if (document != null) DropdownMenuItem(text = { Text("Открыть источник") }, onClick = { menu = false; onSource() })
-                            if (onDelete != null) DropdownMenuItem(text = { Text("Удалить запись", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDelete() }, modifier = Modifier.testTag("delete-reader-quote-" + entry.id))
                             if (onSelect != null) DropdownMenuItem(text = { Text("Выбрать запись") }, onClick = { menu = false; onSelect() })
                         }
                     }
-                    if (onSelect != null && selected != null) {
+                    if (onSelect != null) {
                         val description = stringResource(R.string.select_entry, entry.title)
                         Checkbox(selected == true, { onSelect() }, modifier = Modifier.semantics { contentDescription = description })
                     }
@@ -156,7 +154,10 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
                 entry.anchor?.let { Text(stringResource(R.string.source_page, it.page + 1), style = MaterialTheme.typography.labelMedium) }
                 Text((if (entry.kind == EntryKind.Consp) "Конспект" else stringResource(entry.type.labelId())) + if (tagNames.isEmpty()) "" else " · " + tagNames.joinToString(" ") { "#$it" }, style = MaterialTheme.typography.labelMedium)
                 if (folderNames.isNotEmpty()) Text(folderNames.joinToString(" · "), style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-
+                if (!compact) Row {
+                    TextButton(onClick = onEdit) { Text(stringResource(R.string.edit)) }
+                    if (document != null) TextButton(onClick = onSource) { Text(stringResource(R.string.open_source)) }
+                }
             }
         }
     }

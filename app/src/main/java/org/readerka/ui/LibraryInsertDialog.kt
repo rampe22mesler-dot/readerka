@@ -45,15 +45,6 @@ enum class InsertMode(val label: String) { Inline("Ссылка на текст"
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Вставить из библиотеки") }, text = {
         Column(Modifier.heightIn(max = 570.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Choice("Способ", mode, InsertMode.entries, { it.label }, { mode = it })
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.small) {
-                Column(Modifier.fillMaxWidth().padding(12.dp).testTag("insert-mode-preview"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    when (mode) {
-                        InsertMode.Inline -> { Text(selectedText.ifBlank { "Слово или фраза" }, color = MaterialTheme.colorScheme.primary, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline); Text("Кликабельный текст; содержимое источника не копируется", style = MaterialTheme.typography.bodySmall) }
-                        InsertMode.Card -> { Row { Icon(Outline.Link, null, Modifier.size(20.dp)); Text("  Название источника", color = MaterialTheme.colorScheme.primary) }; Text("Отдельная карточка открывает источник", style = MaterialTheme.typography.bodySmall) }
-                        InsertMode.Content -> { Text("Фрагмент исходного текста…"); Text("Источник: название записи", color = MaterialTheme.colorScheme.primary); Text("Копия текста; изменения источника не заменяют вставку", style = MaterialTheme.typography.bodySmall) }
-                    }
-                }
-            }
             OutlinedTextField(search, { search = it }, label = { Text("Поиск записей") }, modifier = Modifier.testTag("insert-search"))
             if (current.sourceBooks().isNotEmpty()) Row { Checkbox(scope, { scope = it }, modifier = Modifier.testTag("insert-related-scope")); Text("Материалы связанных книг") }
             Choice("Тип", kind, listOf(null) + EntryKind.entries, { when (it) { EntryKind.Quote -> "Цитата"; EntryKind.Note -> "Заметка"; EntryKind.Consp -> "Конспект"; null -> "Все" } }, { kind = it })
@@ -108,8 +99,7 @@ enum class InsertMode(val label: String) { Inline("Ссылка на текст"
                     val value = if (useFragment && preview?.id == entry.id && !fragment.selection.collapsed) original.fragment(fragment.selection.min, fragment.selection.max) else original
                     var content = if (plain) RichText.plain(value.text) else value
                     if (source) {
-                        val prefix = "\n\nИсточник: "
-                        val suffix = RichText.plain(prefix + title).style(prefix.length, prefix.length + title.length, TextStyle.Link, target)
+                        val suffix = RichText.plain("\n\n" + title).style(2, 2 + title.length, TextStyle.Link, target)
                         content = content.replace(content.text.length, content.text.length, suffix)
                     }
                     content

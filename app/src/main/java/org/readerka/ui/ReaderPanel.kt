@@ -1,10 +1,7 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-
 package org.readerka.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,7 +22,7 @@ import org.readerka.data.*
 
 @Composable fun ReaderPanel(document: Document, entries: List<Entry>, bookmarks: List<Bookmark>, data: LibrarySnapshot, vm: LibraryViewModel,
     bookmarksTab: Boolean, onTab: (Boolean) -> Unit, onEdit: (Entry) -> Unit, onSource: (Entry) -> Unit,
-    onBookmark: (Bookmark) -> Unit, onClose: () -> Unit, modifier: Modifier, showHeader: Boolean = true) {
+    onBookmark: (Bookmark) -> Unit, onClose: () -> Unit, modifier: Modifier) {
     val kind = if (bookmarksTab) ReaderFolderKind.Bookmarks else ReaderFolderKind.Quotes
     val folders = data.readerFolders.filter { it.documentId == document.id && it.kind == kind }
     var quoteFolder by rememberSaveable(document.id) { mutableStateOf<String?>(null) }
@@ -52,11 +49,11 @@ import org.readerka.data.*
     val visibleIds = visibleBookmarks.map { it.id }.toSet()
     val orderedBookmarks = FolderTree.ordered(visibleBookmarks, { it.id }, { it.parentId?.takeIf { parent -> parent in visibleIds } })
     Column(modifier.padding(8.dp).testTag("reader-panel")) {
-        if (showHeader) Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.structure_in_pdf), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = onClose) { Text("Скрыть") }
+            IconButton(onClick = onClose) { Icon(Outline.Close, stringResource(R.string.close_reader_panel)) }
         }
-        if (showHeader) Row {
+        Row {
             FilterChip(!bookmarksTab, { onTab(false) }, label = { Text(stringResource(R.string.quotes_in_pdf)) })
             Spacer(Modifier.width(4.dp))
             FilterChip(bookmarksTab, { onTab(true) }, label = { Text(stringResource(R.string.bookmarks)) })
@@ -72,24 +69,29 @@ import org.readerka.data.*
             if (!bookmarksTab) {
                 if (visibleEntries.isEmpty()) item { Text(stringResource(R.string.no_quotes_pdf), modifier = Modifier.padding(12.dp)) }
                 items(visibleEntries, key = { it.id }) { e ->
-                    EntryCard(e, data, { onEdit(e) }, { onSource(e) }, compact = true, onDelete = { deleteEntry = e })
+                    Column {
+                        EntryCard(e, data, { onEdit(e) }, { onSource(e) })
+                        TextButton(onClick = { deleteEntry = e }, modifier = Modifier.testTag("delete-reader-quote-" + e.id)) {
+                            Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             } else {
                 if (visibleBookmarks.isEmpty()) item { Text(stringResource(R.string.no_bookmarks_pdf), modifier = Modifier.padding(12.dp)) }
                 items(orderedBookmarks, key = { it.id }) { b ->
                     val depth = FolderTree.depth(b.id, visibleBookmarks.map { it.id to it.parentId?.takeIf { parent -> parent in visibleIds } })
                     Column(Modifier.padding(start = (depth * 14).coerceAtMost(84).dp).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        var menu by remember { mutableStateOf(false) }
-                        ListItem(headlineContent = { Text(b.title) }, leadingContent = { Icon(Outline.Bookmark, null) }, supportingContent = {
-                            Column { Text(stringResource(R.string.source_page, b.page + 1)); if (b.comment.isNotBlank()) Text(b.comment) }
-                        }, trailingContent = { Box {
-                            WorkspaceAction(Outline.More, "Действия закладки", { menu = true }, Modifier.testTag("bookmark-menu-${b.id}"))
-                            DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem(text = { Text("Открыть страницу") }, onClick = { menu = false; onBookmark(b) })
-                                DropdownMenuItem(text = { Text("Редактировать") }, onClick = { menu = false; bookmarkEditor = b })
-                                DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; deleteBookmark = b })
+                        ListItem(headlineContent = { Text(b.title) }, supportingContent = {
+                            Column {
+                                Text(stringResource(R.string.source_page, b.page + 1))
+                                if (b.comment.isNotBlank()) Text(b.comment)
                             }
-                        } }, modifier = Modifier.combinedClickable(onClick = { onBookmark(b) }, onLongClick = { menu = true }).testTag("reader-bookmark-" + b.id))
+                        }, modifier = Modifier.clickable { onBookmark(b) }.testTag("reader-bookmark-" + b.id))
+                        Row {
+                            TextButton(onClick = { onBookmark(b) }) { Text(stringResource(R.string.go)) }
+                            IconButton(onClick = { bookmarkEditor = b }) { Icon(Outline.Edit, stringResource(R.string.edit)) }
+                            IconButton(onClick = { deleteBookmark = b }) { Icon(Icons.Default.Delete, stringResource(R.string.delete)) }
+                        }
                     }
                 }
             }

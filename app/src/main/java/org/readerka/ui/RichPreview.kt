@@ -34,12 +34,7 @@ import androidx.compose.ui.layout.positionInParent
                 else if (block.style == BlockStyle.LinkCard) Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onLink(block.target) }, onLongClick = { onLinkMenu(block.target) })) {
                     Row(Modifier.padding(start = 12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Icon(Outline.Link, null, Modifier.padding(end = 12.dp).size(24.dp), tint = accent)
-                        Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
-                            Text(raw, color = accent, style = MaterialTheme.typography.titleSmall)
-                            val uri = android.net.Uri.parse(block.target)
-                            Text(if (uri.scheme == "readerka") when (uri.host) { "document" -> "Страница ${uri.getQueryParameter("page") ?: "1"} · источник PDF"; else -> if (uri.getQueryParameter("block") != null) "Ссылка на фрагмент записи" else "Ссылка на запись" } else "Внешняя ссылка · ${uri.host.orEmpty()}", style = MaterialTheme.typography.labelSmall)
-                        }
+                        Text(raw, Modifier.weight(1f), color = accent)
                         WorkspaceAction(Outline.More, "Действия ссылки", { onLinkMenu(block.target) })
                     }
                 } else {

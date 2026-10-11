@@ -193,8 +193,8 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     }
     private fun setPane(pane: Int, value: WorkspacePane) { changeWorkspace(_workspace.value.copy(panes = _workspace.value.panes.toMutableList().also { it[pane] = value })) }
     fun layout(split: Boolean = _workspace.value.split, fraction: Float = _workspace.value.splitFraction,
-        sidebarWidth: Float = _workspace.value.sidebarWidth, structureWidth: Float = _workspace.value.structureWidth, sidebarVisible: Boolean = _workspace.value.sidebarVisible, orientation: SplitOrientation = _workspace.value.splitOrientation) {
-        changeWorkspace(_workspace.value.copy(split = split, splitOrientation = orientation, splitFraction = fraction.coerceIn(.3f, .7f), sidebarWidth = sidebarWidth.coerceIn(200f, 400f), structureWidth = structureWidth.coerceIn(220f, 400f), sidebarVisible = sidebarVisible, visiblePane = if (_workspace.value.split && !split) _workspace.value.activePane else _workspace.value.visiblePane))
+        sidebarWidth: Float = _workspace.value.sidebarWidth, structureWidth: Float = _workspace.value.structureWidth, sidebarVisible: Boolean = _workspace.value.sidebarVisible) {
+        changeWorkspace(_workspace.value.copy(split = split, splitFraction = fraction.coerceIn(.3f, .7f), sidebarWidth = sidebarWidth.coerceIn(200f, 400f), structureWidth = structureWidth.coerceIn(220f, 400f), sidebarVisible = sidebarVisible, visiblePane = if (_workspace.value.split && !split) _workspace.value.activePane else _workspace.value.visiblePane))
         if (!split) focusPane(_workspace.value.visiblePane)
     }
     fun collapsePane(pane: Int) {
@@ -283,7 +283,6 @@ class LibraryViewModel(application: Application, private val savedState: SavedSt
     private val noteReturns = ArrayDeque<NoteReturn>()
     val canReturnToNote = MutableStateFlow(false)
     val requestedBlock = MutableStateFlow<Pair<String, String>?>(null)
-    val requestedEditorAction = MutableStateFlow<Pair<String, String>?>(null)
     fun openLink(link: String, pane: Int, rememberReturn: Boolean = true, data: LibrarySnapshot = library.value) {
         val uri = Uri.parse(link)
         if (uri.scheme == "readerka") {

@@ -119,14 +119,13 @@ class WorkspaceUiTest {
             shortcut(KeyEvent.KEYCODE_TAB); waitFor(docs[0], 3)
             shortcut(KeyEvent.KEYCODE_TAB, shift = true); waitFor(docs[1], 0)
             compose.onNodeWithTag("document-tab-" + docs[0].id).performClick(); waitFor(docs[0], 3)
-            compose.onNodeWithTag("reader-materials-button").performClick()
             compose.onNodeWithTag("reader-quotes-button").performClick()
             savePreview("readerka-0.3-workspace-light.png")
             compose.runOnUiThread { vm.settings(originalPreferences.copy(theme = ThemeMode.Dark)) }
             compose.waitUntil(30_000) { vm.preferences.value.theme == ThemeMode.Dark }
             savePreview("readerka-0.3-workspace-dark.png")
             compose.runOnUiThread { vm.settings(originalPreferences) }
-            shortcut(KeyEvent.KEYCODE_B, shift = true)
+            shortcut(KeyEvent.KEYCODE_B)
             compose.onNodeWithTag("workspace-sidebar").assertDoesNotExist()
             compose.onNodeWithTag("toggle-workspace-sidebar").performClick()
             compose.onNodeWithTag("workspace-sidebar").assertIsDisplayed()

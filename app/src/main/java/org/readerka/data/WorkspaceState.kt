@@ -64,14 +64,11 @@ data class WorkspacePane(val tabs: List<WorkspaceTab> = emptyList(), val selecte
 }
 
 @Serializable
-enum class SplitOrientation { Auto, Horizontal, Vertical }
-
-@Serializable
 data class WorkspaceState(val drafts: List<EntryDraft> = emptyList(), val activeDraftId: String? = null,
     val history: ReadingHistory = ReadingHistory(), val panes: List<WorkspacePane> = listOf(WorkspacePane(), WorkspacePane()),
     val activePane: Int = 0, val split: Boolean = false, val splitFraction: Float = .5f,
     val sidebarWidth: Float = 260f, val structureWidth: Float = 280f, val sidebarVisible: Boolean = true,
-    val visiblePane: Int = 0, val splitOrientation: SplitOrientation = SplitOrientation.Auto, val lastConspByBook: Map<String, String> = emptyMap()) {
+    val visiblePane: Int = 0, val lastConspByBook: Map<String, String> = emptyMap()) {
     val editor get() = drafts.firstOrNull { it.entry.id == activeDraftId }
 }
 

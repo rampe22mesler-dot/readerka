@@ -42,24 +42,6 @@ import org.readerka.data.TextStyle
     else {
         var menuLink by remember { mutableStateOf<String?>(null) }
         var outline by remember { mutableStateOf(false) }
-        var history by remember { mutableStateOf(false) }
-        var readMenu by remember { mutableStateOf(false) }
-        val readHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
-            val action = AppShortcuts.match(event)?.action
-            val known = action in setOf("outline", "preview", "properties", "history")
-            if (known && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) when (action) {
-                "outline" -> outline = true
-                "history" -> history = true
-                "preview" -> { vm.requestedEditorAction.value = entry.id to "focus-body"; vm.editEntry(entry, pane) }
-                "properties" -> { vm.requestedEditorAction.value = entry.id to "properties"; vm.editEntry(entry, pane) }
-            }
-            known
-        })
-        DisposableEffect(entry.id, pane, workspace.activePane) {
-            val handler: (KeyEvent) -> Boolean = { readHandler(it) }
-            if (workspace.activePane == pane) vm.editorKeyHandler = handler
-            onDispose { if (vm.editorKeyHandler === handler) vm.editorKeyHandler = null }
-        }
         val scroll = rememberNoteScroll(pane, id, vm)
         val rich = remember(entry) { entry.richText() }
         val scope = rememberCoroutineScope()
@@ -68,17 +50,10 @@ import org.readerka.data.TextStyle
         LaunchedEffect(requested, positions.size) { if (requested?.first == id) { positions[requested!!.second]?.let { scroll.scrollTo(it); vm.requestedBlock.value = null } } }
         Column(Modifier.fillMaxSize().imePadding()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text((when (entry.kind) { EntryKind.Consp -> "Конспект"; EntryKind.Quote -> "Цитата"; EntryKind.Note -> "Заметка" }) + " · сохранена", modifier = Modifier.weight(1f).padding(start = 16.dp), style = MaterialTheme.typography.labelMedium)
+                Text((if (entry.kind == EntryKind.Consp) "Конспект" else "Заметка") + " · сохранена", modifier = Modifier.weight(1f).padding(start = 16.dp), style = MaterialTheme.typography.labelMedium)
                 WorkspaceAction(Outline.Menu, "Оглавление", { outline = true })
                 WorkspaceAction(Outline.Edit, "Редактировать", { vm.editEntry(entry, pane) })
-                Box {
-                    WorkspaceAction(Outline.More, "Действия документа", { readMenu = true })
-                    DropdownMenu(readMenu, { readMenu = false }) {
-                        ShortcutMenuItem("properties", { readMenu = false; vm.requestedEditorAction.value = entry.id to "properties"; vm.editEntry(entry, pane) })
-                        ShortcutMenuItem("history", { readMenu = false; history = true })
-                        ShortcutMenuItem("right", { readMenu = false; vm.openRight(WorkspaceTab(id, id, WorkspaceKind.Note), pane) })
-                    }
-                }
+                WorkspaceAction(Outline.Split, "Открыть справа", { vm.openRight(WorkspaceTab(id, id, WorkspaceKind.Note), pane) })
             }
             HorizontalDivider()
             Column(Modifier.weight(1f).verticalScroll(scroll).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -92,7 +67,6 @@ import org.readerka.data.TextStyle
             }
         }
         if (outline) OutlineDialog(rich, { outline = false }) { block -> scope.launch { scroll.animateScrollTo(positions[block.id] ?: 0) } }
-        if (history) VersionDialog(entry.id, data, { history = false }) { vm.restoreVersion(it); history = false }
         menuLink?.let { link -> LinkActions(link, data, vm, pane, { menuLink = null }) }
     }
 }
@@ -104,7 +78,6 @@ import org.readerka.data.TextStyle
     val entry = draft.entry
     val rich = remember(entry.content, entry.comment) { entry.richText() }
     var selection by remember(entry.id) { mutableStateOf(TextRange(draft.cursorStart.coerceIn(0, rich.text.length), draft.cursorEnd.coerceIn(0, rich.text.length))) }
-    var template by remember { mutableStateOf(ConspTemplate.Book) }
     var bookSearch by remember { mutableStateOf("") }
     var properties by rememberSaveable(entry.id) { mutableStateOf(false) }
     var preview by rememberSaveable(entry.id) { mutableStateOf(false) }
@@ -117,11 +90,6 @@ import org.readerka.data.TextStyle
     var delete by remember { mutableStateOf(false) }
     var discard by remember { mutableStateOf(false) }
     var menuLink by remember { mutableStateOf<String?>(null) }
-    var styleMenu by remember { mutableStateOf(false) }
-    var formatMenu by remember { mutableStateOf(false) }
-    var insertMenu by remember { mutableStateOf(false) }
-    var moreMenu by remember { mutableStateOf(false) }
-    var saveMenu by remember { mutableStateOf(false) }
     val titleFocus = remember(entry.id) { FocusRequester() }
     val tagsFocus = remember(entry.id) { FocusRequester() }
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -133,62 +101,32 @@ import org.readerka.data.TextStyle
     val scroll = rememberNoteScroll(pane, entry.id, vm)
     val scope = rememberCoroutineScope()
     val requested by vm.requestedBlock.collectAsState()
-    fun currentContent() = vm.workspace.value.drafts.firstOrNull { it.entry.id == entry.id }?.entry?.richText() ?: rich
     fun write(value: RichText, range: TextRange, record: Boolean = true) {
-        val previous = currentContent()
-        if (record && value != previous) { undo += previous to selection; if (undo.size > 100) undo.removeAt(0); redo.clear() }
+        if (record && value != rich) { undo += rich to selection; if (undo.size > 100) undo.removeAt(0); redo.clear() }
         selection = range
         val latest = vm.workspace.value.drafts.firstOrNull { it.entry.id == entry.id } ?: draft
         vm.updateDraft(latest.copy(entry = latest.entry.withContent(value), cursorStart = range.start, cursorEnd = range.end))
     }
     fun format(style: TextStyle) {
         if (selection.collapsed) typingStyles = if (style in typingStyles) typingStyles - style else typingStyles + style
-        else write(currentContent().style(selection.min, selection.max, style), selection)
+        else write(rich.style(selection.min, selection.max, style), selection)
         nativeView?.requestFocus()
     }
     fun undoEdit(forward: Boolean) {
         val from = if (forward) redo else undo; val to = if (forward) undo else redo
-        if (from.isNotEmpty()) { val previous = from.removeAt(from.lastIndex); to += currentContent() to selection; write(previous.first, previous.second, false) }
+        if (from.isNotEmpty()) { val previous = from.removeAt(from.lastIndex); to += rich to selection; write(previous.first, previous.second, false) }
     }
-    fun applyBlock(style: BlockStyle, level: Int = 1) {
-        write(currentContent().paragraph(selection.min, selection.max, style, level), selection)
-        styleMenu = false; nativeView?.requestFocus()
-    }
-    fun currentLink() = rich.marks.firstOrNull { it.style == TextStyle.Link && selection.start in it.start until it.end }?.value
-        ?: rich.blockAt(selection.start).takeIf { it.style == BlockStyle.LinkCard }?.target
     val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
-        val action = AppShortcuts.match(event)?.action
-        val general = action in setOf("outline", "properties", "search", "preview", "history", "checkpoint", "markdown", "convert", "discard", "delete")
-        val editable = !preview && !rawMarkdown && action in (AppShortcuts.editor.map { it.action } + "search")
-        val escape = action == "escape" && (properties || find || styleMenu || formatMenu || insertMenu || moreMenu || saveMenu)
-        val recognized = general || editable || escape
-        if (recognized && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) when (action) {
+        val action = AppShortcuts.match(event, editorContext = true)?.action
+        val recognized = !preview && !rawMarkdown && action != null
+        if (recognized && event.action == KeyEvent.ACTION_DOWN) when (action) {
             "bold" -> format(TextStyle.Bold)
             "italic" -> format(TextStyle.Italic)
             "underline" -> format(TextStyle.Underline)
             "undo" -> undoEdit(false)
             "redo" -> undoEdit(true)
             "link" -> libraryInsert = InsertMode.Inline
-            "insert-card" -> libraryInsert = InsertMode.Card
-            "insert-content" -> libraryInsert = InsertMode.Content
-            "search" -> { find = !find; preview = false; rawMarkdown = false }
-            "paragraph" -> applyBlock(BlockStyle.Paragraph)
-            "heading-1", "heading-2", "heading-3" -> applyBlock(BlockStyle.Heading, action!!.last().digitToInt())
-            "bullet" -> applyBlock(BlockStyle.Bullet)
-            "ordered" -> applyBlock(BlockStyle.Ordered)
-            "quote-block" -> applyBlock(BlockStyle.Quote)
-            "code-block" -> applyBlock(BlockStyle.Code)
-            "outline" -> outline = true
-            "properties" -> properties = !properties
-            "preview" -> preview = !preview
-            "history" -> history = true
-            "checkpoint" -> vm.checkpointDraft(entry.id, "Версия пользователя")
-            "markdown" -> { rawMarkdown = !rawMarkdown; preview = false }
-            "link-actions" -> menuLink = currentLink()
-            "convert" -> if (entry.kind == EntryKind.Note) vm.convertToConsp(entry)
-            "discard" -> discard = true
-            "delete" -> if (data.entries.any { it.id == entry.id }) delete = true
-            "escape" -> { properties = false; find = false; styleMenu = false; formatMenu = false; insertMenu = false; moreMenu = false; saveMenu = false }
+            "find" -> find = !find
         }
         recognized
     })
@@ -196,16 +134,6 @@ import org.readerka.data.TextStyle
         val handler: (KeyEvent) -> Boolean = { keyHandler(it) }
         if (workspace.activePane == pane) vm.editorKeyHandler = handler
         onDispose { if (vm.editorKeyHandler === handler) vm.editorKeyHandler = null }
-    }
-    val editorAction by vm.requestedEditorAction.collectAsState()
-    LaunchedEffect(editorAction, entry.id, nativeView) {
-        if (editorAction?.first == entry.id && (editorAction?.second != "focus-body" || nativeView != null)) {
-            if (editorAction?.second == "focus-body") nativeView?.requestFocus()
-            AppShortcuts.all.firstOrNull { it.action == editorAction!!.second }?.let { binding ->
-                keyHandler(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, binding.code, 0, (if (binding.ctrl) KeyEvent.META_CTRL_ON else 0) or (if (binding.alt) KeyEvent.META_ALT_ON else 0) or (if (binding.shift) KeyEvent.META_SHIFT_ON else 0)))
-            }
-            vm.requestedEditorAction.value = null
-        }
     }
     LaunchedEffect(imeVisible, nativeView, entry.id, workspace.activePane) {
         if (imeVisible && !preview && workspace.activePane == pane && nativeView?.hasWindowFocus() == true) {
@@ -238,148 +166,91 @@ import org.readerka.data.TextStyle
         }
     }
     LaunchedEffect(requested, nativeView) { if (requested?.first == entry.id) rich.blocks.firstOrNull { it.id == requested!!.second }?.let { selection = TextRange(it.start); vm.requestedBlock.value = null; nativeView?.requestFocus() } }
-    val propertiesContent: @Composable (Boolean) -> Unit = { side ->
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Свойства", style = MaterialTheme.typography.titleLarge)
-            if (entry.kind == EntryKind.Consp) {
-                Text("Источники · выберите книги или оставьте конспект тематическим", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(bookSearch, { bookSearch = it }, label = { Text("Найти книгу") }, modifier = Modifier.fillMaxWidth())
-                data.documents.filter { bookSearch.isBlank() || it.title.contains(bookSearch, true) || it.authors.contains(bookSearch, true) }.forEach { book -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(book.id in entry.sources, { checked -> vm.updateDraft(draft.copy(entry = entry.copy(sources = if (checked) (entry.sources + book.id).distinct() else entry.sources - book.id))) }, Modifier.testTag("consp-source-${book.id}")); Text(book.title, modifier = Modifier.weight(1f))
-                } }
-            } else {
-                data.documents.firstOrNull { it.id == entry.documentId }?.let { Text("Источник · " + it.title) }
-                Choice(stringResource(R.string.type), entry.type, NoteType.entries, { stringResource(it.labelId()) }, { vm.updateDraft(draft.copy(entry = entry.copy(type = it))) })
-                if (entry.kind == EntryKind.Note) TextButton(onClick = { vm.convertToConsp(entry) }) { Text("Преобразовать заметку в конспект") }
-            }
-            if (entry.kind == EntryKind.Consp) {
-                Choice("Шаблон структуры", template, ConspTemplate.entries.filter { it != ConspTemplate.Blank }, { it.title }, { template = it })
-                TextButton(onClick = {
-                    scope.launch { vm.checkpointDraft(entry.id, "До вставки шаблона").join(); val current = vm.workspace.value.drafts.firstOrNull { it.entry.id == entry.id }?.entry?.richText() ?: rich; val separated = current.replace(current.text.length, current.text.length, RichText.plain(if (current.text.isNotBlank()) "\n\n" else "")); val value = separated.replace(separated.text.length, separated.text.length, RichText.fromMarkdown(template.source)); write(value, TextRange(value.text.length)) }
-                }) { Text("Добавить структуру в конец") }
-            }
-            FolderMembershipChoice("Темы / общие папки", data.collections.map { FolderItem(it.id, it.name, it.parentId) }, draft.collections, { vm.updateDraft(draft.copy(collections = it)) }, Modifier.testTag("entry-collections"))
-            OutlinedTextField(draft.tags, { vm.updateDraft(draft.copy(tags = it)) }, enabled = !saving, label = { Text(stringResource(R.string.tags)) }, modifier = Modifier.fillMaxWidth().focusRequester(tagsFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "tags") }.testTag("entry-tags"))
-            ColorPalette(entry.color) { vm.updateDraft(draft.copy(entry = entry.copy(color = it))) }
-            if (entry.kind == EntryKind.Quote && entry.documentId != null) FolderMembershipChoice("Папки цитат внутри PDF", data.readerFolders.filter { it.documentId == entry.documentId && it.kind == ReaderFolderKind.Quotes }.map { FolderItem(it.id, it.name, it.parentId) }, draft.readerFolders, { vm.updateDraft(draft.copy(readerFolders = it)) }, Modifier.testTag("entry-reader-folders"))
-            Backlinks(entry, data, vm, pane)
-            if (side) TextButton(onClick = { properties = false }, modifier = Modifier.testTag("close-note-properties")) { Text("Готово") }
-        }
-    }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-      val sideProperties = maxWidth >= 850.dp
-      Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize().testTag("entry-editor")) {
+    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize().testTag("entry-editor")) {
         Column(Modifier.imePadding().onFocusChanged { onEditorFocus(it.hasFocus) }.focusGroup()) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                WorkspaceAction(Outline.Menu, "Оглавление · " + AppShortcuts.keys("outline"), { outline = true }, Modifier.testTag("note-outline"))
-                if (!preview && !rawMarkdown) {
-                    val block = rich.blockAt(selection.min)
-                    val styleLabel = when (block.style) { BlockStyle.Heading -> "Заголовок ${block.level}"; BlockStyle.Bullet -> "Список"; BlockStyle.Ordered -> "Нумерация"; BlockStyle.Quote -> "Цитата"; BlockStyle.Code -> "Код"; else -> "Абзац" }
-                    Box {
-                        TextButton(onClick = { styleMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("editor-style").semantics { contentDescription = "Стиль: $styleLabel" }) { Text(styleLabel); Icon(Outline.Down, null, Modifier.size(16.dp)) }
-                        DropdownMenu(styleMenu, { styleMenu = false }) {
-                            listOf("paragraph" to BlockStyle.Paragraph, "heading-1" to BlockStyle.Heading, "heading-2" to BlockStyle.Heading, "heading-3" to BlockStyle.Heading, "bullet" to BlockStyle.Bullet, "ordered" to BlockStyle.Ordered, "quote-block" to BlockStyle.Quote, "code-block" to BlockStyle.Code).forEach { (action, style) ->
-                                ShortcutMenuItem(action, { applyBlock(style, if (action.startsWith("heading-")) action.last().digitToInt() else 1) })
-                            }
-                        }
-                    }
-                    Box {
-                        TextButton(onClick = { formatMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("editor-format")) { Text("Оформление") }
-                        DropdownMenu(formatMenu, { formatMenu = false }) {
-                            listOf("bold" to TextStyle.Bold, "italic" to TextStyle.Italic, "underline" to TextStyle.Underline).forEach { (action, style) ->
-                                val active = if (selection.collapsed) style in typingStyles else rich.marks.any { it.style == style && it.start <= selection.min && it.end >= selection.max }
-                                ShortcutMenuItem(action, { format(style); formatMenu = false }, label = (if (active) "✓ " else "") + AppShortcuts.label(action), modifier = Modifier.testTag("menu-format-$action"))
-                            }
-                        }
-                    }
-                    Box {
-                        TextButton(onClick = { insertMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("editor-insert")) { Icon(Outline.Plus, null, Modifier.size(18.dp)); Text("Вставить") }
-                        DropdownMenu(insertMenu, { insertMenu = false }) {
-                            ShortcutMenuItem("link", { insertMenu = false; libraryInsert = InsertMode.Inline }, label = "Ссылка на слово / фразу", modifier = Modifier.testTag("insert-link"))
-                            ShortcutMenuItem("insert-card", { insertMenu = false; libraryInsert = InsertMode.Card }, label = "Ссылка блоком", modifier = Modifier.testTag("insert-card"))
-                            ShortcutMenuItem("insert-content", { insertMenu = false; libraryInsert = InsertMode.Content }, modifier = Modifier.testTag("insert-library"))
-                        }
-                    }
-                } else Text(if (preview) "Режим чтения" else "Исходный Markdown", Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.labelLarge)
-                Box {
-                    WorkspaceAction(Outline.More, "Действия документа", { moreMenu = true }, Modifier.testTag("editor-more"))
-                    DropdownMenu(moreMenu, { moreMenu = false }) {
-                        ShortcutMenuItem("preview", { moreMenu = false; preview = !preview }, label = if (preview) "Редактировать" else "Режим чтения", modifier = Modifier.testTag("markdown-preview"))
-                        ShortcutMenuItem("properties", { moreMenu = false; properties = !properties }, modifier = Modifier.testTag("note-properties-menu"))
-                        ShortcutMenuItem("search", { moreMenu = false; find = !find; preview = false; rawMarkdown = false })
-                        ShortcutMenuItem("undo", { moreMenu = false; undoEdit(false) }, enabled = undo.isNotEmpty() && !preview && !rawMarkdown)
-                        ShortcutMenuItem("redo", { moreMenu = false; undoEdit(true) }, enabled = redo.isNotEmpty() && !preview && !rawMarkdown)
-                        ShortcutMenuItem("link-actions", { moreMenu = false; menuLink = currentLink() }, enabled = currentLink() != null)
-                        ShortcutMenuItem("history", { moreMenu = false; history = true })
-                        ShortcutMenuItem("markdown", { moreMenu = false; rawMarkdown = !rawMarkdown; preview = false })
-                        ShortcutMenuItem("discard", { moreMenu = false; discard = true }, enabled = !saving)
-                        ShortcutMenuItem("delete", { moreMenu = false; delete = true }, enabled = !saving && data.entries.any { it.id == entry.id }, modifier = Modifier.testTag("delete-quote"))
-                    }
-                }
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(when (entry.kind) { EntryKind.Consp -> "Конспект"; EntryKind.Quote -> "Комментарий к цитате"; EntryKind.Note -> "Заметка" }, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                WorkspaceAction(Outline.Menu, "Оглавление", { outline = true }, Modifier.testTag("note-outline"))
+                WorkspaceAction(Outline.Settings, "Свойства", { properties = !properties }, Modifier.testTag("note-properties"), selected = properties)
+                WorkspaceAction(if (preview) Outline.Edit else Outline.Preview, if (preview) "Редактировать" else "Режим чтения", { preview = !preview }, Modifier.testTag("markdown-preview"))
+                WorkspaceAction(Outline.Close, stringResource(R.string.close_editor), { vm.focusPane(pane); vm.closeEditor() })
             }
-            if (!preview && !rawMarkdown && !selection.collapsed) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("selection-format-actions"), verticalAlignment = Alignment.CenterVertically) {
-                listOf(TextStyle.Bold to "Ж", TextStyle.Italic to "К", TextStyle.Underline to "Ч").forEach { (style, text) ->
-                    val active = rich.marks.any { it.style == style && it.start <= selection.min && it.end >= selection.max }
-                    FilterChip(active, { format(style) }, label = { Text(text, fontWeight = if (style == TextStyle.Bold) androidx.compose.ui.text.font.FontWeight.Bold else null, fontStyle = if (style == TextStyle.Italic) androidx.compose.ui.text.font.FontStyle.Italic else null, textDecoration = if (style == TextStyle.Underline) androidx.compose.ui.text.style.TextDecoration.Underline else null) }, modifier = Modifier.padding(start = 8.dp).heightIn(min = 48.dp).testTag("format-${style.name.lowercase()}").semantics { contentDescription = when (style) { TextStyle.Bold -> "Жирный"; TextStyle.Italic -> "Курсив"; else -> "Подчёркивание" } })
+            if (!preview && !rawMarkdown) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { format(TextStyle.Bold) }, modifier = Modifier.heightIn(min = 48.dp).testTag("format-bold").semantics { contentDescription = "Жирный" }) { Text("Ж", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
+                TextButton(onClick = { format(TextStyle.Italic) }, modifier = Modifier.heightIn(min = 48.dp).testTag("format-italic").semantics { contentDescription = "Курсив" }) { Text("К", fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) }
+                TextButton(onClick = { format(TextStyle.Underline) }, modifier = Modifier.heightIn(min = 48.dp).testTag("format-underline").semantics { contentDescription = "Подчёркивание" }) { Text("Ч", textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline) }
+                var blockMenu by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { blockMenu = true }) { Text("Абзац / заголовок") }
+                    DropdownMenu(blockMenu, { blockMenu = false }) {
+                        listOf(BlockStyle.Paragraph to "Обычный текст", BlockStyle.Heading to "Заголовок 1", BlockStyle.Heading to "Заголовок 2", BlockStyle.Heading to "Заголовок 3", BlockStyle.Bullet to "Список", BlockStyle.Ordered to "Нумерованный список", BlockStyle.Quote to "Цитатный блок", BlockStyle.Code to "Код").forEachIndexed { index, (style, name) ->
+                            DropdownMenuItem(text = { Text(name) }, onClick = { write(rich.paragraph(selection.min, selection.max, style, if (index in 1..3) index else 1), selection); blockMenu = false })
+                        }
+                    }
                 }
-                TextButton(onClick = { libraryInsert = InsertMode.Inline }, modifier = Modifier.heightIn(min = 48.dp).testTag("selection-insert-link")) { Text("Ссылка") }
+                TextButton(onClick = { libraryInsert = InsertMode.Inline }, modifier = Modifier.testTag("insert-link")) { Text("Ссылка") }
+                TextButton(onClick = { libraryInsert = InsertMode.Content }, modifier = Modifier.testTag("insert-library")) { Text("Вставить из библиотеки") }
+                TextButton(onClick = { undoEdit(false) }) { Text("Отменить") }
+                TextButton(onClick = { undoEdit(true) }) { Text("Повторить") }
+                TextButton(onClick = { find = !find }) { Text("Найти") }
+                val existingLink = rich.marks.firstOrNull { it.style == TextStyle.Link && selection.start in it.start..it.end }?.value ?: rich.blockAt(selection.start).takeIf { it.style == BlockStyle.LinkCard }?.target
+                if (existingLink != null) TextButton(onClick = { menuLink = existingLink }) { Text("Действия ссылки") }
             }
             HorizontalDivider()
-            Row(Modifier.weight(1f).fillMaxWidth()) {
-              Box(Modifier.weight(1f).fillMaxHeight().onGloballyPositioned { bodyViewport = it.boundsInWindow() }) {
-                Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = if (LocalCompact.current) 16.dp else 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextField(entry.title, { vm.updateDraft(draft.copy(entry = entry.copy(title = it))) }, enabled = !saving,
-                        placeholder = { Text(if (entry.kind == EntryKind.Consp) "Название конспекта" else "Название заметки") }, textStyle = MaterialTheme.typography.headlineMedium,
-                        colors = TextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth().focusRequester(titleFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "title") }.testTag("entry-title"))
-                    if (!imeVisible) Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { properties = !properties }, modifier = Modifier.testTag("note-properties")) { Text("Источники: ${entry.sourceBooks().size}") }
-                        TextButton(onClick = { properties = !properties }) { Text(data.collections.firstOrNull { it.id in draft.collections }?.name?.let { "Тема: " + it + if (draft.collections.size > 1) " +${draft.collections.size - 1}" else "" } ?: "Добавить тему") }
-                        TextButton(onClick = { properties = !properties }) { Text("Теги: ${draft.tags.split(',').count { it.isNotBlank() }}") }
-                    }
-                    if (entry.anchor != null) { Text("Исходная цитата · страница ${entry.anchor.page + 1}", style = MaterialTheme.typography.labelMedium); Text(entry.quote) }
-                    if (find) Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(query, { query = it }, label = { Text("Найти в документе") }, modifier = Modifier.weight(1f).testTag("editor-search-field"))
-                        TextButton(onClick = { val index = rich.text.indexOf(query, (selection.max + 1).coerceAtMost(rich.text.length), true).let { if (it < 0) rich.text.indexOf(query, ignoreCase = true) else it }; if (index >= 0 && query.isNotEmpty()) { selection = TextRange(index, index + query.length); nativeView?.requestFocus() } }) { Text("Далее") }
-                    }
-                    when {
-                        preview -> RichPreview(rich, { vm.openLink(it, pane) }, { menuLink = it }, Modifier.testTag("markdown-rendered"))
-                        rawMarkdown -> OutlinedTextField(entry.comment, { value -> vm.updateDraft(draft.copy(entry = entry.copy(comment = value, content = null))) }, label = { Text("Markdown") }, modifier = Modifier.fillMaxWidth().testTag("markdown-source"))
-                        else -> RichEditor(rich, selection, { next, range ->
-                            var formatted = next
-                            if (next.text.length > rich.text.length && typingStyles.isNotEmpty()) {
-                                val start = (range.end - (next.text.length - rich.text.length)).coerceAtLeast(0)
-                                typingStyles.forEach { style -> if (formatted.marks.none { it.style == style && it.start <= start && it.end >= range.end }) formatted = formatted.style(start, range.end.coerceAtMost(next.text.length), style) }
-                            }
-                            write(formatted, range)
-                        }, { selection = it }, { vm.focusPane(pane); vm.focusEditorField(entry.id, "body") }, { nativeView = it }, label = when (entry.kind) { EntryKind.Consp -> "Текст конспекта"; EntryKind.Note -> "Текст заметки"; EntryKind.Quote -> "Комментарий к цитате" })
-                    }
+            Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { bodyViewport = it.boundsInWindow() }) {
+            Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = if (LocalCompact.current) 16.dp else 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(entry.title, { vm.updateDraft(draft.copy(entry = entry.copy(title = it))) }, enabled = !saving,
+                    placeholder = { Text(if (entry.kind == EntryKind.Consp) "Название конспекта" else "Название заметки") }, textStyle = MaterialTheme.typography.headlineMedium,
+                    colors = TextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth().focusRequester(titleFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "title") }.testTag("entry-title"))
+                if (entry.anchor != null) { Text("Исходная цитата · страница ${entry.anchor.page + 1}", style = MaterialTheme.typography.labelMedium); Text(entry.quote) }
+                if (find) Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(query, { query = it }, label = { Text("Найти в документе") }, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { val index = rich.text.indexOf(query, (selection.max + 1).coerceAtMost(rich.text.length), true).let { if (it < 0) rich.text.indexOf(query, ignoreCase = true) else it }; if (index >= 0 && query.isNotEmpty()) { selection = TextRange(index, index + query.length); nativeView?.requestFocus() } }) { Text("Далее") }
                 }
-              }
-              if (properties && sideProperties) Surface(Modifier.width(340.dp).fillMaxHeight().testTag("note-properties-panel"), color = MaterialTheme.colorScheme.surfaceContainerLow) { propertiesContent(true) }
+                when {
+                    preview -> RichPreview(rich, { vm.openLink(it, pane) }, { menuLink = it }, Modifier.testTag("markdown-rendered"))
+                    rawMarkdown -> OutlinedTextField(entry.comment, { value -> vm.updateDraft(draft.copy(entry = entry.copy(comment = value, content = null))) }, label = { Text("Markdown") }, modifier = Modifier.fillMaxWidth().testTag("markdown-source"))
+                    else -> RichEditor(rich, selection, { next, range ->
+                        var formatted = next
+                        if (next.text.length > rich.text.length && typingStyles.isNotEmpty()) {
+                            val start = (range.end - (next.text.length - rich.text.length)).coerceAtLeast(0)
+                            typingStyles.forEach { style -> if (formatted.marks.none { it.style == style && it.start <= start && it.end >= range.end }) formatted = formatted.style(start, range.end.coerceAtMost(next.text.length), style) }
+                        }
+                        write(formatted, range)
+                    }, { selection = it }, { vm.focusPane(pane); vm.focusEditorField(entry.id, "body") }, { nativeView = it })
+                }
+                if (properties) {
+                    HorizontalDivider(); Text("Свойства записи", style = MaterialTheme.typography.titleSmall)
+                    if (entry.kind == EntryKind.Consp) {
+                        Text("Связанные книги · можно выбрать несколько или убрать все")
+                        OutlinedTextField(bookSearch, { bookSearch = it }, label = { Text("Найти книгу для связи") }, modifier = Modifier.fillMaxWidth())
+                        data.documents.filter { bookSearch.isBlank() || it.title.contains(bookSearch, true) || it.authors.contains(bookSearch, true) }.forEach { book -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(book.id in entry.sources, { checked -> vm.updateDraft(draft.copy(entry = entry.copy(sources = if (checked) (entry.sources + book.id).distinct() else entry.sources - book.id))) }, Modifier.testTag("consp-source-${book.id}")); Text(book.title, modifier = Modifier.weight(1f))
+                        } }
+                    } else {
+                        data.documents.firstOrNull { it.id == entry.documentId }?.let { Text("Источник · " + it.title) }
+                        Choice(stringResource(R.string.type), entry.type, NoteType.entries, { stringResource(it.labelId()) }, { vm.updateDraft(draft.copy(entry = entry.copy(type = it))) })
+                        if (entry.kind == EntryKind.Note) TextButton(onClick = { vm.convertToConsp(entry) }) { Text("Преобразовать заметку в конспект") }
+                    }
+                    ColorPalette(entry.color) { vm.updateDraft(draft.copy(entry = entry.copy(color = it))) }
+                    OutlinedTextField(draft.tags, { vm.updateDraft(draft.copy(tags = it)) }, enabled = !saving, label = { Text(stringResource(R.string.tags)) }, modifier = Modifier.fillMaxWidth().focusRequester(tagsFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "tags") }.testTag("entry-tags"))
+                    FolderMembershipChoice("Темы / общие папки", data.collections.map { FolderItem(it.id, it.name, it.parentId) }, draft.collections, { vm.updateDraft(draft.copy(collections = it)) }, Modifier.testTag("entry-collections"))
+                    if (entry.kind == EntryKind.Quote && entry.documentId != null) FolderMembershipChoice("Папки цитат внутри PDF", data.readerFolders.filter { it.documentId == entry.documentId && it.kind == ReaderFolderKind.Quotes }.map { FolderItem(it.id, it.name, it.parentId) }, draft.readerFolders, { vm.updateDraft(draft.copy(readerFolders = it)) }, Modifier.testTag("entry-reader-folders"))
+                    TextButton(onClick = { history = true }) { Text("История изменений") }
+                    TextButton(onClick = { vm.checkpointDraft(entry.id, "Версия пользователя") }) { Text("Сохранить контрольную версию") }
+                    TextButton(onClick = { rawMarkdown = !rawMarkdown; preview = false }) { Text(if (rawMarkdown) "Визуальный редактор" else "Исходный Markdown") }
+                    Backlinks(entry, data, vm, pane)
+                    TextButton(enabled = !saving, onClick = { discard = true }) { Text("Удалить черновик") }
+                    if (data.entries.any { it.id == entry.id }) TextButton(enabled = !saving, onClick = { delete = true }, modifier = Modifier.testTag("delete-quote")) { Text("Удалить запись", color = MaterialTheme.colorScheme.error) }
+                }
+            }
             }
             HorizontalDivider()
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (entry.kind != EntryKind.Consp) {
-                    Text(status, style = MaterialTheme.typography.labelSmall, maxLines = 2, modifier = Modifier.weight(1f).testTag("draft-status"))
-                    TextButton(enabled = !saving && entry.title.isNotBlank(), onClick = { vm.saveEditor(entry.id) }, modifier = Modifier.heightIn(min = 48.dp).testTag("save-entry")) { Text("Сохранить") }
-                } else {
-                    val saved = data.entries.firstOrNull { it.id == entry.id }
-                    val savedTags = data.entryTags.filter { it.entryId == entry.id }.mapNotNull { link -> data.tags.firstOrNull { it.id == link.tagId }?.name?.lowercase(java.util.Locale.ROOT) }.sorted()
-                    val unchanged = saved?.copy(updatedAt = entry.updatedAt) == entry && savedTags == draft.tags.split(',').map { it.trim().lowercase(java.util.Locale.ROOT) }.filter { it.isNotEmpty() }.distinct().sorted() && data.memberships.filter { it.entryId == entry.id }.map { it.collectionId }.toSet() == draft.collections.intersect(data.collections.map { it.id }.toSet())
-                    Text("Конспект", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
-                    Box {
-                        TextButton(onClick = { saveMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("entry-save-status")) { Text(when { saving -> "Сохранение…"; unchanged -> "Сохранено · История"; entry.title.isBlank() -> "Укажите название · История"; else -> "Изменения · История" }) }
-                        DropdownMenu(saveMenu, { saveMenu = false }) {
-                            ShortcutMenuItem("history", { saveMenu = false; history = true })
-                            ShortcutMenuItem("save", { saveMenu = false; vm.saveEditor(entry.id) }, enabled = !saving && entry.title.isNotBlank(), label = "Сохранить сейчас", modifier = Modifier.testTag("save-entry"))
-                            ShortcutMenuItem("checkpoint", { saveMenu = false; vm.checkpointDraft(entry.id, "Версия пользователя") })
-                        }
-                    }
-                }
+                Text(status, style = MaterialTheme.typography.labelSmall, maxLines = 2, modifier = Modifier.weight(1f).testTag("draft-status"))
+                TextButton(enabled = !saving && entry.title.isNotBlank(), onClick = { vm.saveEditor(entry.id) }, modifier = Modifier.heightIn(min = 48.dp).testTag("save-entry")) { Text("Сохранить") }
             }
         }
-      }
-      if (properties && !sideProperties) AlertDialog(onDismissRequest = { properties = false }, title = {}, text = { Box(Modifier.heightIn(max = 520.dp).testTag("note-properties-panel")) { propertiesContent(false) } }, confirmButton = { TextButton(onClick = { properties = false }, modifier = Modifier.testTag("close-properties-dialog")) { Text("Готово") } })
     }
     libraryInsert?.let { mode -> LibraryInsertDialog(data, entry, rich.text.substring(selection.min.coerceIn(0, rich.text.length), selection.max.coerceIn(0, rich.text.length)), mode, { libraryInsert = null }) { fragment, link ->
         scope.launch {
