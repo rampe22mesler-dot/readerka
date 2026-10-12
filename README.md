@@ -1,3 +1,13 @@
+# Readerka 1.0.0 для Windows
+
+[Скачать установщик MSI](https://github.com/rampe22mesler-dot/readerka/releases/download/v1.0.0/readerka-1.0.0-windows-x64.msi) · [Все файлы релиза 1.0.0](https://github.com/rampe22mesler-dot/readerka/releases/tag/v1.0.0) · [Исходники и сборка Windows](windows/README.md)
+
+Windows 10/11 x64, Java включена. Доступны установщик и portable ZIP. Книги, цитаты, заметки, конспекты, исследовательские поля, граф библиотеки и ручной перенос ZIP/Dropbox. Личная библиотека хранится в `%LOCALAPPDATA%\Readerka` отдельно от программы.
+
+Windows-проект находится в `windows/`: самостоятельные модули `desktop` и `shared`, исходники, тесты, Gradle wrapper и сценарий упаковки MSI. Android-код в `app/` и прежние загрузки сохранены. Windows ZIP библиотеки имеет формат 5; прежние Android-версии его не принимают. Установщик не подписан сертификатом издателя.
+
+## Android: прежняя версия и документация
+
 # Readerka
 
 Нативное офлайн-приложение для чтения PDF и независимой организации цитат и заметок. Kotlin, Jetpack Compose, Material 3, Room и DataStore. Ориентир — **Huawei MatePad 11.5 S / HarmonyOS 4.2**, с поддержкой Android APK. Минимальный Android API — 28.

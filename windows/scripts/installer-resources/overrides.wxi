@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Preserve newer installations when an older MSI is opened. -->
+<Include>
+  <?undef JpAllowDowngrades?>
+</Include>

@@ -1,0 +1,4 @@
+d3b4b03ae2bdca8516a36ef6eb27b777f0528c9eda26745d9962824a3fdfeccf  djvulibre-3.5.29.tar.gz
+75c3ec241e9996504fe02a9ed4d12f16b74ade713972f3db9e65ce95cd27e35d  jpegsrc.v6b.tar.gz
+2c52d11ccaf767457db0c46795d9c7d1a8d8f76f68b0b800a3dfe45786b996e4  tiff-4.0.10.tar.gz
+c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1  zlib-1.2.11.tar.gz
