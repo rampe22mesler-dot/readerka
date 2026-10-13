@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 package org.readerka.ui
 
 import android.app.Activity
@@ -5,6 +6,7 @@ import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -36,13 +38,28 @@ import org.readerka.MainActivity
 import org.readerka.data.*
 
 @Composable fun ReaderkaRoot(activity: Activity, vm: LibraryViewModel) {
+    val loaded by vm.workspaceLoaded.collectAsStateWithLifecycle()
+    val loadError by vm.workspaceLoadError.collectAsStateWithLifecycle()
+    if (!loaded) {
+        MaterialTheme {
+            Surface(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    if (loadError == null) { CircularProgressIndicator(); Text("Открытие библиотеки…", Modifier.padding(16.dp)) }
+                    else { Text(loadError!!); TextButton(onClick = { activity.finish() }) { Text("Закрыть") } }
+                }
+            }
+        }
+        return
+    }
     val data by vm.library.collectAsStateWithLifecycle()
     val preferences by vm.preferences.collectAsStateWithLifecycle()
     val screen by vm.screen.collectAsStateWithLifecycle()
     val readers by vm.readers.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val workspace by vm.workspace.collectAsStateWithLifecycle()
+    val pendingTransfer by vm.pendingTransfer.collectAsStateWithLifecycle()
     var commands by remember { mutableStateOf(false) }
+    var navigationMenu by remember { mutableStateOf(false) }
     var sourcesOnly by remember { mutableStateOf(false) }
     var helpOpen by remember { mutableStateOf(false) }
     var createConsp by remember { mutableStateOf(false) }
@@ -70,9 +87,9 @@ import org.readerka.data.*
             when (kind) { ExportKind.Obsidian -> zip.launch("Readerka-Obsidian.zip"); ExportKind.Backup -> zip.launch("Readerka-backup.zip"); ExportKind.Markdown -> markdown.launch("Readerka-notes.md"); ExportKind.Csv -> csv.launch("Readerka-notes.csv") }
         }
     }
-    val importPdf: (String?) -> Unit = { folder -> if (busy == null) { importFolder = folder; import.launch(arrayOf("application/pdf")) } }
-    val tabs = listOf("library" to "Библиотека", "reader" to "Чтение", "notes" to "Заметки и цитаты", "consp" to "Конспекты", "settings" to "Настройки")
-    val icons = listOf(Outline.Folder, Outline.Book, Outline.Note, Outline.Edit, Outline.Settings)
+    val importPdf: (String?) -> Unit = { folder -> if (busy == null) { importFolder = folder; import.launch(arrayOf("*/*")) } }
+    val tabs = listOf("library" to "Библиотека", "reader" to "Чтение", "notes" to "Заметки и цитаты", "consp" to "Конспекты", "fields" to "Исследовательские поля", "graph" to "Граф библиотеки", "settings" to "Настройки")
+    val icons = listOf(Outline.Folder, Outline.Book, Outline.Note, Outline.Edit, Outline.Split, Outline.Search, Outline.Settings)
     val dark = when (preferences.theme) { ThemeMode.System -> isSystemInDarkTheme(); ThemeMode.Dark -> true; ThemeMode.Light -> false }
     val colors = if (dark) darkColorScheme(primary = Color(0xFFB7A2ED), onPrimary = Color(0xFF281C40), secondaryContainer = Color(0xFF343044),
         surface = Color(0xFF222226), background = Color(0xFF222226), surfaceContainerLow = Color(0xFF1B1B1F), surfaceContainer = Color(0xFF29292F), surfaceContainerHigh = Color(0xFF313137), outlineVariant = Color(0xFF39393F), onSurface = Color(0xFFE4E3E8), onSurfaceVariant = Color(0xFFB4B1BE))
@@ -88,6 +105,7 @@ import org.readerka.data.*
         }
     }
     val focusManager = LocalFocusManager.current
+    val inputModeManager = androidx.compose.ui.platform.LocalInputModeManager.current
     val selected = workspace.panes[workspace.activePane].selected
     val reader = readers[workspace.activePane].takeIf { selected?.kind == WorkspaceKind.Pdf }
     val currentData by rememberUpdatedState(data)
@@ -98,14 +116,33 @@ import org.readerka.data.*
     val pane0 = remember(vm) { movableContentOf { WorkspacePaneContent(0, currentData, vm, currentReaders[0], currentWorkspace, currentFullscreen, { fullscreen = it }, paneKeys) } }
     val pane1 = remember(vm) { movableContentOf { WorkspacePaneContent(1, currentData, vm, currentReaders[1], currentWorkspace, currentFullscreen, { fullscreen = it }, paneKeys) } }
     val shortcut: (KeyEvent) -> Boolean = shortcut@{ event ->
-        if (!commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp && selected?.kind == WorkspaceKind.Note && vm.editorKeyHandler?.invoke(event) == true) return@shortcut true
+        if (pendingTransfer == null && !commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp && selected?.kind == WorkspaceKind.Note && vm.editorKeyHandler?.invoke(event) == true) return@shortcut true
+        if (pendingTransfer == null && !commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp && selected?.kind == WorkspaceKind.ResearchField && vm.fieldKeyHandler?.invoke(event) == true) return@shortcut true
+        if (pendingTransfer != null) return@shortcut false
         val action = AppShortcuts.match(event)?.action
         val recognized = action != null
         if (recognized && event.action == KeyEvent.ACTION_DOWN) when (action) {
-            "back" -> if (canReturn) vm.returnToNote() else vm.historyBack()
+            "back" -> vm.historyBack()
+            "return" -> vm.returnToNote()
             "forward" -> vm.historyForward()
             "search" -> if (reader != null) vm.requestReaderTool(ReaderTool.Search)
             "commands" -> { commands = true; sourcesOnly = false }
+            "import-book" -> importPdf(null)
+            "import-zip" -> restore.launch(arrayOf("application/zip", "application/octet-stream"))
+            "export-zip" -> export(ExportKind.Backup, null)
+            "save-all" -> vm.saveAllEditors()
+            "graph" -> vm.openLibraryGraph()
+            "split" -> vm.layout(split = !workspace.split)
+            "collapse" -> vm.collapseSecondary()
+            "right" -> selected?.let { vm.openRight(it) }
+            "focus-pane" -> if (workspace.split) vm.focusPane(1 - workspace.activePane)
+            "bookmark" -> vm.requestReaderTool(ReaderTool.NewBookmark)
+            "bookmarks" -> vm.requestReaderTool(ReaderTool.Bookmarks)
+            "quotes" -> vm.requestReaderTool(ReaderTool.Quotes)
+            "book-consp" -> vm.requestReaderTool(ReaderTool.Consp)
+            "quote" -> vm.requestReaderTool(ReaderTool.Quote)
+            "append-consp" -> vm.requestReaderTool(ReaderTool.AppendConsp)
+            "field-insert" -> if (selected?.kind == WorkspaceKind.Pdf) vm.requestReaderTool(ReaderTool.ToField) else currentData.entries.firstOrNull { it.id == selected?.documentId }?.let(vm::requestFieldInsertion)
             "sources" -> { commands = true; sourcesOnly = true }
             "note" -> vm.newNote(reader?.document?.id, notesFolder.takeIf { screen == "notes" })
             "consp" -> createConsp = true
@@ -119,7 +156,10 @@ import org.readerka.data.*
             "escape" -> when { fullscreen -> fullscreen = false; helpOpen -> helpOpen = false; commands -> commands = false; layoutOpen -> layoutOpen = false; draftsOpen -> draftsOpen = false; createConsp -> createConsp = false; else -> return@shortcut false }
         }
         if (!recognized && event.keyCode == KeyEvent.KEYCODE_TAB && !event.isCtrlPressed && !commands && !layoutOpen && !draftsOpen && !helpOpen && !createConsp) {
-            if (event.action == KeyEvent.ACTION_DOWN) focusManager.moveFocus(if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next)
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                inputModeManager.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
+                focusManager.moveFocus(if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next)
+            }
             true
         } else recognized || (screen == "reader" && !commands && !draftsOpen && !layoutOpen && !helpOpen && !createConsp && reader != null && vm.readerKeyHandler?.invoke(event) == true)
     }
@@ -129,16 +169,20 @@ import org.readerka.data.*
     val density = LocalDensity.current
     CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale * preferences.scale), LocalCompact provides preferences.compact) {
       MaterialTheme(colorScheme = colors, shapes = Shapes(small = androidx.compose.foundation.shape.RoundedCornerShape(6.dp), medium = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), large = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize().testTag("readerka-ready")) {
             val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
             val windowWidth = maxWidth
-            val wide = windowWidth >= 1000.dp
+            val wide = windowWidth >= 1200.dp
             BackHandler(drawer) { drawer = false }
             val toggleSidebar = { if (wide) vm.layout(sidebarVisible = !workspace.sidebarVisible) else drawer = !drawer }
             Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
                 if (!fullscreen) Surface(color = colors.surfaceContainerLow) {
                     Column(Modifier.statusBarsPadding()) {
-                        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().height(48.dp).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                            WorkspaceAction(Outline.More, "Разделы и команды", { navigationMenu = true }, Modifier.testTag("navigation-menu"))
+                            DropdownMenu(navigationMenu, { navigationMenu = false }) { tabs.forEach { tab -> DropdownMenuItem(text = { Text(tab.second) }, onClick = { navigationMenu = false; vm.navigate(tab.first) }) } }
+                            }
                             WorkspaceAction(Outline.Menu, "Проводник · Ctrl+B", toggleSidebar, Modifier.testTag("toggle-workspace-sidebar"))
                             Text("Readerka", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.weight(1f))
                             if (windowWidth > 600.dp) {
@@ -150,17 +194,17 @@ import org.readerka.data.*
                             WorkspaceAction(Outline.Split, "Области и размеры", { layoutOpen = true }, Modifier.testTag("workspace-layout"), selected = workspace.split)
                             WorkspaceAction(Outline.Fullscreen, "Полный экран · F11", { fullscreen = true }, Modifier.testTag("fullscreen-button"))
                             WorkspaceAction(Outline.Help, "Справка · F1", { helpOpen = true }, Modifier.testTag("help-button"))
-                            WorkspaceAction(Outline.Plus, "Добавить PDF", { importPdf(null) })
+                            WorkspaceAction(Outline.Plus, "Добавить книгу", { importPdf(null) })
                         }
                         HorizontalDivider()
                     }
                 }
             }, bottomBar = {
-                if (windowWidth < 600.dp && !fullscreen && !imeVisible) Row(Modifier.fillMaxWidth().navigationBarsPadding(), horizontalArrangement = Arrangement.SpaceEvenly) { tabs.forEachIndexed { i, tab -> WorkspaceAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
+                if (windowWidth < 600.dp && !fullscreen && !imeVisible) Row(Modifier.fillMaxWidth().navigationBarsPadding(), horizontalArrangement = Arrangement.spacedBy(2.dp)) { tabs.filter { it.first !in setOf("fields", "graph") }.forEachIndexed { i, tab -> WorkspaceAction(icons[tabs.indexOf(tab)], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
             }) { padding ->
                 Row(Modifier.fillMaxSize().padding(padding)) {
                     if (windowWidth >= 600.dp && !fullscreen) Surface(color = colors.surfaceContainerLow) {
-                        Column(Modifier.width(52.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { tabs.forEachIndexed { i, tab -> WorkspaceAction(icons[i], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
+                        Column(Modifier.width(52.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { tabs.forEachIndexed { i, tab -> WorkspaceAction(icons[tabs.indexOf(tab)], tab.second, { vm.navigate(tab.first) }, Modifier.testTag("workspace-nav-${tab.first}"), selected = screen == tab.first) } }
                     }
                     if (wide && workspace.sidebarVisible && !fullscreen) {
                         WorkspaceSidebar(data, reader?.document?.id, vm, importPdf, {}, Modifier.width(workspace.sidebarWidth.dp).fillMaxHeight(), screen in listOf("notes", "consp"), catalogueFolders, selectCatalogueFolder, consp = screen == "consp")
@@ -171,14 +215,21 @@ import org.readerka.data.*
                             busy?.let { Text(activity.getString(it.label), style = MaterialTheme.typography.labelMedium); LinearProgressIndicator(Modifier.fillMaxWidth()) }
                             when (screen) {
                                 "reader" -> BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                                    val horizontal = maxWidth >= 700.dp
+                                    val horizontal = maxWidth >= 840.dp
                                     val available = (if (horizontal) maxWidth else maxHeight).value - 48f
                                     val paneContent: @Composable (Int) -> Unit = { pane -> if (pane == 0) pane0() else pane1() }
-                                    if (!workspace.split || (imeVisible && !horizontal)) paneContent(if (workspace.split) workspace.activePane else workspace.visiblePane)
+                                    if (!workspace.split || !horizontal || (imeVisible && maxHeight < 500.dp)) Column(Modifier.fillMaxSize()) {
+                                        if (workspace.split) Row(Modifier.fillMaxWidth()) {
+                                            (0..1).forEach { pane -> TextButton(onClick = { vm.focusPane(pane) }) { Text("Область ${pane + 1}" + if (workspace.activePane == pane) " ✓" else "") } }
+                                        }
+                                        Box(Modifier.weight(1f).fillMaxWidth()) { paneContent(if (workspace.split) workspace.activePane else workspace.visiblePane) }
+                                    }
                                     else SplitWorkspace(workspace, vm, horizontal, available, paneContent)
                                 }
                                 "notes" -> NotesScreen(data, vm, notesFolder, { notesFolder = it }, { if (wide) vm.layout(sidebarVisible = true) else drawer = true }, export)
                                 "consp" -> NotesScreen(data, vm, conspFolder, { conspFolder = it }, { if (wide) vm.layout(sidebarVisible = true) else drawer = true }, export, consp = true)
+                                "fields" -> ResearchFieldsCatalogue(data, vm)
+                                "graph" -> LibraryGraphScreen(data, vm)
                                 "settings" -> SettingsScreen(preferences, data, vm, export, { restore.launch(arrayOf("application/zip", "application/octet-stream")) })
                                 else -> LibraryScreen(data, vm, false, importPdf, workspace = true, folder = libraryFolder, onFolder = { libraryFolder = it })
                             }
@@ -203,9 +254,11 @@ import org.readerka.data.*
                     Text("Панель PDF · ${workspace.structureWidth.toInt()} dp")
                     Slider(workspace.structureWidth, { vm.layout(structureWidth = it) }, valueRange = 220f..400f)
                     TextButton(onClick = { vm.layout(fraction = .5f, sidebarWidth = 260f, structureWidth = 280f) }) { Text("Стандартные размеры") }
-                    Text("Границы с ручками можно перемещать касанием. На узком экране области располагаются одна над другой.", style = MaterialTheme.typography.bodySmall)
+                    Text("Границы с ручками можно перемещать касанием. На узком экране видна активная область; переключение сохраняет вкладки второй области.", style = MaterialTheme.typography.bodySmall)
                 }
             }, confirmButton = { TextButton(onClick = { layoutOpen = false }) { Text("Готово") } })
+            FieldInsertionDialog(data, vm)
+            pendingTransfer?.let { TransferDialog(it, vm, busy != null) }
             if (helpOpen) HelpDialog { helpOpen = false }
             if (createConsp) CreateConspDialog(data, reader?.document?.id, notesFolder.takeIf { screen == "consp" }, vm) { createConsp = false }
             if (draftsOpen) DraftList(workspace.drafts, data, vm) { draftsOpen = false }
@@ -220,6 +273,14 @@ import org.readerka.data.*
                     add(QuickCommand("drafts", "Открыть черновики") { draftsOpen = true })
                     add(QuickCommand("library", "Открыть библиотеку") { vm.navigate("library") })
                     add(QuickCommand("notes", "Каталог заметок") { vm.navigate("notes") })
+                    add(QuickCommand("new-field", "Создать исследовательское поле") { vm.navigate("fields") })
+                    add(QuickCommand("import-zip", "Импорт ZIP", "Ctrl+Shift+O") { restore.launch(arrayOf("application/zip", "application/octet-stream")) })
+                    add(QuickCommand("export-zip", "Экспорт ZIP", "Ctrl+Shift+E") { export(ExportKind.Backup, null) })
+                    add(QuickCommand("split", "Две области", "Ctrl+Alt+S") { vm.layout(split = !workspace.split) })
+                    add(QuickCommand("focus-pane", "Перейти в другую область", "F6") { if (workspace.split) vm.focusPane(1 - workspace.activePane) })
+                    add(QuickCommand("fields", "Исследовательские поля") { vm.navigate("fields") })
+                    add(QuickCommand("graph", "Граф библиотеки") { vm.openLibraryGraph() })
+                    data.researchFields.forEach { field -> add(QuickCommand("field-${field.id}", field.title, "Исследовательское поле") { vm.openResearchField(field.id) }) }
                     add(QuickCommand("settings", "Настройки") { vm.navigate("settings") })
                     add(QuickCommand("layout", "Области и размеры") { layoutOpen = true })
                     add(QuickCommand("sidebar", "Показать или скрыть проводник", "Ctrl+B") { toggleSidebar() })
@@ -263,6 +324,8 @@ import org.readerka.data.*
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab?.kind) {
                     WorkspaceKind.Pdf -> if (session?.tabId == tab.id) ReaderScreen(session, data, vm, wide, fullscreen, onFullscreen, allowPageKeys = keys && active) else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    WorkspaceKind.ResearchField -> key(tab.id) { ResearchFieldScreen(tab.documentId, data, vm, pane) }
+                    WorkspaceKind.LibraryGraph -> LibraryGraphScreen(data, vm)
                     WorkspaceKind.Note -> key(tab.id) { NoteDocument(tab.documentId, data, vm, pane) }
                     null -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Text("Область ${pane + 1}", style = MaterialTheme.typography.titleMedium); TextButton(onClick = { vm.focusPane(pane); vm.navigate("library") }) { Text("Открыть PDF") }; TextButton(onClick = { vm.focusPane(pane); vm.newNote() }) { Text("Создать заметку") }; TextButton(onClick = { vm.focusPane(pane); vm.newConsp(title = "Новый конспект") }) { Text("Создать конспект") } }
                 }

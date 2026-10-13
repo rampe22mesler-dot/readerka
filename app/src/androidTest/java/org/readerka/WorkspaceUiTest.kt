@@ -25,6 +25,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class WorkspaceUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     @Test fun treeTabsPositionsClosingAndActivityRecreation() {
         val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
         val dao = app.database.dao()
@@ -56,6 +57,7 @@ class WorkspaceUiTest {
             }
             compose.onNodeWithTag("reader-page-counter").assertTextEquals("Страница ${page + 1} из 4")
         }
+        fun tabId(document: Document) = vm.workspace.value.panes.flatMap { it.tabs }.single { it.kind == WorkspaceKind.Pdf && it.documentId == document.id }.id
         fun shortcut(code: Int, shift: Boolean = false) = compose.runOnUiThread {
             for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
                 val now = SystemClock.uptimeMillis()
@@ -106,19 +108,20 @@ class WorkspaceUiTest {
             val anchor = PdfEngine(File(app.filesDir, "pdfs/${docs[0].storedName}"), app.cacheDir).use { it.text(3).matches("Reading, research").first() }
             val quote = Entry("quote-$id", "Чтение и аргументация", "Reading, research", "Тезис для дальнейшего анализа.", docs[0].id, anchor, NoteType.Quote)
             runBlocking { dao.putFolder(folder); dao.putFolder(child); docs.forEach { dao.putDocument(it) }; dao.putEntry(quote) }
-            compose.runOnUiThread { vm.open(docs[0]) }; waitFor(docs[0], 0)
+            compose.runOnUiThread { vm.layout(split = false, sidebarVisible = true); vm.focusPane(0); vm.open(docs[0]) }; waitFor(docs[0], 0)
             compose.onNodeWithTag("workspace-sidebar").assertIsDisplayed()
-            compose.onNodeWithTag("workspace-folder-" + child.id).assertIsDisplayed()
+            compose.onNodeWithTag("explorer-f:" + child.id).assertIsDisplayed()
             compose.runOnUiThread {
                 for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP))
                     assertTrue(compose.activity.window.callback.dispatchKeyEvent(KeyEvent(action, KeyEvent.KEYCODE_MOVE_END)))
             }
             waitFor(docs[0], 3)
             compose.waitUntil(30_000) { runBlocking { dao.allDocuments().first { it.id == docs[0].id }.lastPage == 3 } }
-            compose.onNodeWithTag("workspace-document-" + docs[1].id).performClick(); waitFor(docs[1], 0)
+            compose.onNodeWithTag("explorer-d:" + docs[1].id).performClick(); waitFor(docs[1], 0)
+            val secondTabId = tabId(docs[1])
             shortcut(KeyEvent.KEYCODE_TAB); waitFor(docs[0], 3)
             shortcut(KeyEvent.KEYCODE_TAB, shift = true); waitFor(docs[1], 0)
-            compose.onNodeWithTag("document-tab-" + docs[0].id).performClick(); waitFor(docs[0], 3)
+            compose.onNodeWithTag("workspace-tab-" + tabId(docs[0])).performClick(); waitFor(docs[0], 3)
             compose.onNodeWithTag("reader-quotes-button").performClick()
             savePreview("readerka-0.3-workspace-light.png")
             compose.runOnUiThread { vm.settings(originalPreferences.copy(theme = ThemeMode.Dark)) }
@@ -129,13 +132,15 @@ class WorkspaceUiTest {
             compose.onNodeWithTag("workspace-sidebar").assertDoesNotExist()
             compose.onNodeWithTag("toggle-workspace-sidebar").performClick()
             compose.onNodeWithTag("workspace-sidebar").assertIsDisplayed()
-            compose.onNodeWithTag("close-tab-" + docs[1].id).performClick()
-            compose.onNodeWithTag("document-tab-" + docs[1].id).assertDoesNotExist(); waitFor(docs[0], 3)
+            compose.onNodeWithTag("close-tab-" + secondTabId).performClick()
+            compose.onNodeWithTag("workspace-tab-" + secondTabId).assertDoesNotExist(); waitFor(docs[0], 3)
             compose.activityRule.scenario.recreate(); waitFor(docs[0], 3)
-            compose.onNodeWithTag("document-tab-" + docs[0].id).assertIsDisplayed()
-            compose.onNodeWithTag("document-tab-" + docs[1].id).assertDoesNotExist()
+            compose.onNodeWithTag("workspace-tab-" + tabId(docs[0])).assertIsDisplayed()
+            compose.onNodeWithTag("workspace-tab-" + secondTabId).assertDoesNotExist()
             shortcut(KeyEvent.KEYCODE_W)
-            compose.waitUntil(30_000) { vm.reader.value == null && vm.screen.value == "library" }
+            compose.waitUntil(30_000) { vm.reader.value == null && vm.workspace.value.panes.all { it.tabs.isEmpty() } }
+            compose.onNodeWithText("Открыть PDF", substring = false).assertIsDisplayed().performClick()
+            compose.waitUntil(30_000) { vm.screen.value == "library" }
         } finally {
             compose.runOnUiThread { vm.settings(originalPreferences); docs.forEach { vm.closeDocument(it.id) }; vm.navigate("library") }
             runBlocking { dao.deleteEntries(listOf("quote-$id")); docs.forEach { dao.deleteDocument(it.id) }; dao.deleteFolder(child.id); dao.deleteFolder(folder.id) }

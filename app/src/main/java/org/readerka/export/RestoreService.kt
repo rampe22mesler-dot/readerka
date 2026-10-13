@@ -1,54 +1,89 @@
 package org.readerka.export
 
 import androidx.room.withTransaction
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.readerka.data.*
+import org.readerka.pdf.PdfEngine
 import java.io.File
 import java.security.MessageDigest
+import java.util.UUID
+
+fun pdfDigest(file: File): String = file.inputStream().use { input ->
+    val md = MessageDigest.getInstance("SHA-256"); val buffer = ByteArray(65536)
+    while (true) { val n = input.read(buffer); if (n < 0) break; md.update(buffer, 0, n) }
+    md.digest().joinToString("") { "%02x".format(it) }
+}
 
 class RestoreService(private val repository: LibraryRepository) {
-    /** Merge a verified snapshot. Conflicting IDs fail instead of overwriting current research. */
-    suspend fun restore(staged: StagedBackup) {
-        val createdFiles = mutableListOf<File>()
-        val s = staged.data
-        try {
-            repository.database.withTransaction {
-                val current = repository.dao.snapshot()
-                fun <T> checkConflicts(old: List<T>, new: List<T>, id: (T) -> String) {
-                    val existing = old.associateBy(id)
-                    new.forEach { require(existing[id(it)] == null || existing[id(it)] == it) { "Conflicting backup ID" } }
-                }
-                checkConflicts(current.documents, s.documents) { it.id }; checkConflicts(current.entries, s.entries) { it.id }
-                checkConflicts(current.documentFolders, s.documentFolders) { it.id }; checkConflicts(current.collections, s.collections) { it.id }
-                checkConflicts(current.tags, s.tags) { it.id }; checkConflicts(current.bookmarks, s.bookmarks) { it.id }
-                checkConflicts(current.readerFolders, s.readerFolders) { it.id }; checkConflicts(current.noteVersions, s.noteVersions) { it.id }
-                require(s.tags.none { t -> current.tags.any { it.name == t.name && it.id != t.id } }) { "Conflicting tag identity" }
-                fun hash(file: File): ByteArray = file.inputStream().use { input ->
-                    val md = MessageDigest.getInstance("SHA-256"); val buffer = ByteArray(65536)
-                    while (true) { val n = input.read(buffer); if (n < 0) break; md.update(buffer, 0, n) }; md.digest()
-                }
-                for (d in s.documents) {
-                    val source = File(staged.directory, "pdfs/${d.storedName}")
-                    val target = repository.pdfFile(d)
-                    if (target.exists()) require(hash(target).contentEquals(hash(source))) { "Conflicting PDF" }
-                    else {
-                        val temporary = File(repository.pdfDirectory, d.storedName + ".restore")
-                        try { source.copyTo(temporary, overwrite = false); require(temporary.renameTo(target)); createdFiles += target }
-                        finally { temporary.delete() }
+    /** Existing callers reject conflicts; the transfer UI requires an explicit policy. */
+    suspend fun restore(staged: StagedBackup) { apply(staged, ImportPolicy.KeepLocal, strict = true) }
+    suspend fun restore(staged: StagedBackup, policy: ImportPolicy, expected: LibrarySnapshot? = null): File = apply(staged, policy, strict = false, expected = expected)
+
+    suspend fun checkPdfs(staged: StagedBackup): StagedBackup = withContext(Dispatchers.IO) {
+        val documents = staged.data.documents.map { d ->
+            val count = PdfEngine(File(staged.directory, "pdfs/${d.storedName}"), repository.context.cacheDir).use { it.pageCount }
+            require(d.pageCount == 0 || d.pageCount == count) { "Число страниц PDF не совпадает с архивом: ${d.originalName}" }
+            d.copy(pageCount = count, lastPage = d.lastPage.coerceIn(0, count - 1))
+        }
+        staged.copy(data = staged.data.copy(documents = documents)).also { BackupArchive.validate(it.data) }
+    }
+
+    fun pdfConflicts(staged: StagedBackup) = staged.data.documents.filter { d ->
+        val live = repository.pdfFile(d)
+        live.isFile && pdfDigest(live) != pdfDigest(File(staged.directory, "pdfs/${d.storedName}"))
+    }.map { it.id }
+
+    private suspend fun apply(staged: StagedBackup, policy: ImportPolicy, strict: Boolean, expected: LibrarySnapshot? = null): File {
+        repository.ensureRecovered()
+        return withContext(NonCancellable + Dispatchers.IO) {
+            repository.storageLock.withLock {
+                var transaction: PdfFileTransaction? = null
+                var committed = false
+                var clean = true
+                try {
+                    val checked = checkPdfs(staged)
+                    lateinit var backup: File
+                    repository.database.withTransaction {
+                        val before = repository.dao.snapshot()
+                        require(expected == null || expected == before) { "Библиотека изменилась; повторите сравнение" }
+                        if (strict) require(LibraryMerge.differences(before, checked.data).isEmpty() && pdfConflicts(checked).isEmpty()) { "Conflicting backup ID or PDF; choose an import policy" }
+                        val next = LibraryMerge.merge(before, checked.data, policy)
+                        val oldIds = before.documents.map { it.id }.toSet()
+                        val incoming = checked.data.documents.filter { policy != ImportPolicy.KeepLocal || it.id !in oldIds }
+                            .map { it.storedName to File(staged.directory, "pdfs/${it.storedName}") }
+                        val journalBytes = incoming.sumOf { (name, file) -> file.length() + File(repository.pdfDirectory, name).let { if (it.isFile) it.length() else 0L } }
+                        val backupBytes = before.documents.sumOf { repository.pdfFile(it).length() }
+                        require(repository.pdfDirectory.usableSpace > journalBytes + backupBytes + 16L * 1024 * 1024) { "Недостаточно места для резервной копии и безопасного импорта" }
+                        backup = File(repository.backups, "before-import-${System.currentTimeMillis()}-${UUID.randomUUID()}.zip")
+                        val pending = File(backup.parentFile, backup.name + ".part")
+                        try {
+                            pending.outputStream().use { BackupArchive.write(it, before, repository::pdfFile) }
+                            require(pending.renameTo(backup)) { "Не удалось сохранить резервную копию" }
+                        } finally { pending.delete() }
+                        transaction = PdfFileTransaction.prepare(repository.transactionDirectory, repository.pdfDirectory, incoming)
+                        transaction!!.apply()
+                        repository.dao.replaceSnapshot(next)
+                        repository.dao.putImportReceipt(ImportReceipt(transaction!!.id))
                     }
+                    committed = true
+                    transaction!!.clean()
+                    repository.dao.deleteImportReceipt(transaction!!.id)
+                    backup
+                } catch (e: Exception) {
+                    transaction?.let { tx ->
+                        if (!committed && repository.dao.importCommitted(tx.id) == 0) {
+                            try { tx.rollback() } catch (rollback: Exception) { clean = false; e.addSuppressed(rollback) }
+                        }
+                    }
+                    throw e
+                } finally {
+                    if (clean) transaction?.clean()
+                    staged.directory.deleteRecursively()
                 }
-                val dao = repository.dao
-                FolderTree.ordered(s.documentFolders, { it.id }, { it.parentId }).forEach { dao.putFolder(it) }
-                FolderTree.ordered(s.collections, { it.id }, { it.parentId }).forEach { dao.putCollection(it) }
-                s.documents.forEach { dao.putDocument(it) }
-                FolderTree.ordered(s.readerFolders, { it.id }, { it.parentId }).forEach { dao.putReaderFolder(it) }
-                s.entries.forEach { dao.putEntry(it) }
-                s.noteVersions.forEach { dao.putNoteVersion(it) }
-                s.tags.forEach { dao.putTag(it) }; s.memberships.forEach { dao.putMembership(it) }
-                s.entryTags.forEach { dao.putEntryTag(it) }; s.documentTags.forEach { dao.putDocumentTag(it) }
-                s.readerMemberships.forEach { dao.putReaderMembership(it) }
-                FolderTree.ordered(s.bookmarks, { it.id }, { it.parentId }).forEach { dao.putBookmark(it) }
             }
-        } catch (e: Exception) { createdFiles.forEach { it.delete() }; throw e }
-        finally { staged.directory.deleteRecursively() }
+        }
     }
 }

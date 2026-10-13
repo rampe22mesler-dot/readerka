@@ -9,7 +9,7 @@
     <string name="empty_library">Моя библиотека\nПока нет документов</string>
     <string name="empty_notes">Пока нет заметок и цитат</string>
     <string name="empty_folders">Пока нет папок</string>
-    <string name="add_pdf">Добавить PDF</string>
+    <string name="add_pdf">Добавить книгу</string>
     <string name="create_folder">Создать папку</string>
     <string name="create_note">Создать заметку</string>
     <string name="my_document_folders">Папки документов</string>
@@ -83,7 +83,7 @@
     <string name="backup">Создать резервную копию</string>
     <string name="restore">Восстановить резервную копию</string>
     <string name="restore_explanation">Проверенный архив добавляется к библиотеке. Конфликтующие записи не перезаписываются.</string>
-    <string name="offline_notice">Все данные хранятся на устройстве. Для чтения интернет не нужен. Только окно Google Переводчика использует интернет и получает выбранный вами текст.</string>
+    <string name="offline_notice">Все данные хранятся на устройстве. Для чтения интернет не нужен. Перевод отправляет выбранный текст Google. Dropbox использует интернет только по вашим командам обмена.</string>
     <string name="importing">Импорт PDF…</string>
     <string name="opening">Открытие PDF…</string>
     <string name="exporting">Экспорт…</string>

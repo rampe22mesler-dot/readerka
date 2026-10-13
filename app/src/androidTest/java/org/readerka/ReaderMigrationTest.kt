@@ -38,8 +38,9 @@ class ReaderMigrationTest {
             val database = LibraryDatabase.open(app, name)
             try {
                 val repository = LibraryRepository(app, database)
-                val s = repository.dao.snapshot() // Room validates actual version 4 schema.
-                assertEquals(4, s.version)
+                val s = repository.dao.snapshot() // Room validates the current schema, including 4→5.
+                assertEquals(5, s.version)
+                assertTrue(s.researchFields.isEmpty())
                 assertEquals(2, s.entries.size)
                 assertEquals(6, s.collections.size)
                 assertEquals("Retained note", s.entries.first { it.id == "note" }.comment)

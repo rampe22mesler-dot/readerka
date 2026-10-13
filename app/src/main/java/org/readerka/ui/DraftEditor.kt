@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.*
@@ -76,6 +77,22 @@ import org.readerka.data.TextStyle
     val saving by vm.editorSaving.collectAsState()
     val workspace by vm.workspace.collectAsState()
     val entry = draft.entry
+    val quoteHistory = remember(entry.id) { vm.quoteHistory(entry.id) }
+    var quoteFocused by remember(entry.id) { mutableStateOf(false) }
+    var quoteValue by remember(entry.id) { mutableStateOf(TextFieldValue(entry.quote,
+        if (draft.focusedField == "quote") TextRange(draft.cursorStart.coerceIn(0, entry.quote.length), draft.cursorEnd.coerceIn(0, entry.quote.length)) else TextRange.Zero)) }
+    LaunchedEffect(entry.quote) { if (quoteValue.text != entry.quote) quoteValue = quoteValue.copy(text = entry.quote, selection = TextRange(quoteValue.selection.start.coerceIn(0, entry.quote.length), quoteValue.selection.end.coerceIn(0, entry.quote.length))) }
+    fun changeQuote(value: TextFieldValue, record: Boolean = true) {
+        if (record && value.text != quoteValue.text) { quoteHistory.undo.add(quoteValue.text to quoteValue.selection); quoteHistory.redo.clear(); if (quoteHistory.undo.size > 100) quoteHistory.undo.removeAt(0) }
+        quoteValue = value
+        val latest = vm.workspace.value.drafts.firstOrNull { it.entry.id == entry.id } ?: draft
+        vm.updateDraft(latest.copy(entry = latest.entry.copy(quote = value.text), cursorStart = value.selection.start, cursorEnd = value.selection.end, focusedField = "quote"))
+    }
+    fun undoQuote(forward: Boolean) {
+        val from = if (forward) quoteHistory.redo else quoteHistory.undo
+        val to = if (forward) quoteHistory.undo else quoteHistory.redo
+        if (from.isNotEmpty()) { val prior = from.removeAt(from.lastIndex); to.add(quoteValue.text to quoteValue.selection); changeQuote(TextFieldValue(prior.first, prior.second), false) }
+    }
     val rich = remember(entry.content, entry.comment) { entry.richText() }
     var selection by remember(entry.id) { mutableStateOf(TextRange(draft.cursorStart.coerceIn(0, rich.text.length), draft.cursorEnd.coerceIn(0, rich.text.length))) }
     var bookSearch by remember { mutableStateOf("") }
@@ -113,12 +130,15 @@ import org.readerka.data.TextStyle
         nativeView?.requestFocus()
     }
     fun undoEdit(forward: Boolean) {
+        if (draft.focusedField == "quote") { undoQuote(forward); return }
         val from = if (forward) redo else undo; val to = if (forward) undo else redo
         if (from.isNotEmpty()) { val previous = from.removeAt(from.lastIndex); to += rich to selection; write(previous.first, previous.second, false) }
     }
     val keyHandler by rememberUpdatedState<(KeyEvent) -> Boolean>({ event ->
         val action = AppShortcuts.match(event, editorContext = true)?.action
-        val recognized = !preview && !rawMarkdown && action != null
+        val recognized = action != null && (
+            action in setOf("preview", "properties", "find") ||
+            (!preview && !rawMarkdown && ((quoteFocused && action in setOf("undo", "redo")) || nativeView?.hasFocus() == true)))
         if (recognized && event.action == KeyEvent.ACTION_DOWN) when (action) {
             "bold" -> format(TextStyle.Bold)
             "italic" -> format(TextStyle.Italic)
@@ -127,6 +147,11 @@ import org.readerka.data.TextStyle
             "redo" -> undoEdit(true)
             "link" -> libraryInsert = InsertMode.Inline
             "find" -> find = !find
+            "insert" -> libraryInsert = InsertMode.Content
+            "preview" -> preview = !preview
+            "properties" -> properties = !properties
+            "heading-1", "heading-2", "heading-3" -> write(rich.paragraph(selection.min, selection.max, BlockStyle.Heading, action!!.last().digitToInt()), selection)
+            "paragraph" -> write(rich.paragraph(selection.min, selection.max, BlockStyle.Paragraph), selection)
         }
         recognized
     })
@@ -149,7 +174,7 @@ import org.readerka.data.TextStyle
     LaunchedEffect(selection, entry.id, bodyViewport) {
         delay(250)
         vm.workspace.value.drafts.firstOrNull { it.entry.id == entry.id }?.let { latest ->
-            if (latest.cursorStart != selection.start || latest.cursorEnd != selection.end) vm.updateDraft(latest.copy(cursorStart = selection.start, cursorEnd = selection.end))
+            if (latest.focusedField == "body" && (latest.cursorStart != selection.start || latest.cursorEnd != selection.end)) vm.updateDraft(latest.copy(cursorStart = selection.start, cursorEnd = selection.end))
         }
         nativeView?.let { editor ->
             if (editor.hasFocus() && bodyViewport.height > 0) {
@@ -202,7 +227,14 @@ import org.readerka.data.TextStyle
                 TextField(entry.title, { vm.updateDraft(draft.copy(entry = entry.copy(title = it))) }, enabled = !saving,
                     placeholder = { Text(if (entry.kind == EntryKind.Consp) "Название конспекта" else "Название заметки") }, textStyle = MaterialTheme.typography.headlineMedium,
                     colors = TextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth().focusRequester(titleFocus).onFocusChanged { if (it.isFocused) vm.focusEditorField(entry.id, "title") }.testTag("entry-title"))
-                if (entry.anchor != null) { Text("Исходная цитата · страница ${entry.anchor.page + 1}", style = MaterialTheme.typography.labelMedium); Text(entry.quote) }
+                if (entry.kind == EntryKind.Quote || entry.quote.isNotBlank()) {
+                    Text(entry.anchor?.let { "Цитата · страница ${it.page + 1}" } ?: "Цитата", style = MaterialTheme.typography.labelMedium)
+                    if (preview) Text(entry.quote)
+                    else OutlinedTextField(quoteValue, { changeQuote(it) }, enabled = !saving,
+                        label = { Text("Текст цитаты") }, modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp).testTag("entry-quotation")
+                            .onFocusChanged { quoteFocused = it.isFocused; if (it.isFocused) { vm.focusPane(pane); vm.focusEditorField(entry.id, "quote") } })
+                    Text("Комментарий", style = MaterialTheme.typography.labelMedium)
+                }
                 if (find) Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(query, { query = it }, label = { Text("Найти в документе") }, modifier = Modifier.weight(1f))
                     TextButton(onClick = { val index = rich.text.indexOf(query, (selection.max + 1).coerceAtMost(rich.text.length), true).let { if (it < 0) rich.text.indexOf(query, ignoreCase = true) else it }; if (index >= 0 && query.isNotEmpty()) { selection = TextRange(index, index + query.length); nativeView?.requestFocus() } }) { Text("Далее") }

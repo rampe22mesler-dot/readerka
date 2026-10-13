@@ -8,17 +8,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.readerka.pdf.PdfEngine
+import org.readerka.importer.BookImporter
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.readerka.export.PdfFileTransaction
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 class LibraryRepository(val context: Context, val database: LibraryDatabase, pdfRoot: File = File(context.filesDir, "pdfs")) {
     val dao = database.dao()
     val pdfDirectory = pdfRoot.apply { mkdirs() }
+    val transactionDirectory = File(pdfDirectory.parentFile, pdfDirectory.name + "-transactions")
+    val backups = File(pdfDirectory.parentFile, pdfDirectory.name + "-backups").apply { mkdirs() }
+    val storageLock = Mutex()
+    private var recovered = false
+    suspend fun ensureRecovered() = storageLock.withLock {
+        if (!recovered) {
+            val receipts = dao.allImportReceipts().map { it.id }.toSet()
+            withContext(Dispatchers.IO) { PdfFileTransaction.recover(transactionDirectory, pdfDirectory) { it in receipts } }
+            receipts.forEach { dao.deleteImportReceipt(it) }
+            recovered = true
+        }
+    }
     val snapshots = database.invalidationTracker.createFlow(
-        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks", "reader_folders", "reader_memberships", "note_versions"
-    ).map { dao.snapshot() }
+        "documents", "document_folders", "entries", "collections", "memberships", "tags", "entry_tags", "document_tags", "bookmarks", "reader_folders", "reader_memberships", "note_versions", "research_fields"
+    ).map { ensureRecovered(); dao.snapshot() }
+    suspend fun saveResearchField(field: ResearchField) = database.withTransaction {
+        field.validate(dao.allEntries().map { it.id }.toSet())
+        dao.putResearchField(ResearchFieldRow.from(field))
+    }
+    suspend fun deleteEntries(ids: Set<String>) = database.withTransaction {
+        dao.allResearchFields().forEach { row ->
+            val field = row.field()
+            dao.putResearchField(ResearchFieldRow.from(field.removePlacements(field.placements.filter { it.entryId in ids }.map { it.id }.toSet())))
+        }
+        dao.deleteEntries(ids.toList())
+    }
     fun pdfFile(document: Document): File {
         require(document.storedName.matches(Regex("[A-Za-z0-9_-]+\\.pdf"))) { "Unsafe PDF name" }
         return File(pdfDirectory, document.storedName)
@@ -29,18 +56,27 @@ class LibraryRepository(val context: Context, val database: LibraryDatabase, pdf
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) name = c.getString(0) ?: name
         }
+        require(BookImporter.extensions.any { name.endsWith(".$it", true) }) { "Неподдерживаемый формат: $name" }
+        val extension = if (name.endsWith(".fb2.zip", true)) "fb2.zip" else name.substringAfterLast('.').lowercase(java.util.Locale.ROOT)
+        val source = File(context.cacheDir, "$id.$extension")
         val pending = File(pdfDirectory, "$id.part")
         val file = File(pdfDirectory, "$id.pdf")
-        try {
-            context.contentResolver.openInputStream(uri)?.use { input -> pending.outputStream().use { output ->
-                val buffer = ByteArray(64 * 1024); var total = 0L
-                while (true) { val n = input.read(buffer); if (n < 0) break; total += n; require(total <= 1024L * 1024 * 1024) { "PDF exceeds 1 GiB" }; output.write(buffer, 0, n) }
-            } } ?: error("Cannot open selected PDF")
-            val pages = PdfEngine(pending, context.cacheDir).use { it.pageCount }
-            require(pending.renameTo(file)) { "Cannot save PDF" }
-            val document = Document(id, name.substringBeforeLast('.'), name, file.name, folderId, pageCount = pages)
-            dao.putDocument(document); document
-        } catch (e: Exception) { pending.delete(); file.delete(); throw e }
+        ensureRecovered()
+        storageLock.withLock {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input -> source.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024); var total = 0L
+                    val limit = if (extension == "pdf") 1024L * 1024 * 1024 else if (extension in setOf("djvu", "djv")) 512L * 1024 * 1024 else 64L * 1024 * 1024
+                    while (true) { val n = input.read(buffer); if (n < 0) break; total += n; require(total <= limit) { "Книга превышает поддерживаемый размер" }; require(source.parentFile!!.usableSpace > n + 16L * 1024 * 1024) { "Недостаточно места" }; output.write(buffer, 0, n) }
+                } } ?: error("Не удалось открыть выбранную книгу")
+                val info = BookImporter.convert(source, pending, context, name)
+                val pages = PdfEngine(pending, context.cacheDir).use { it.pageCount }
+                require(pending.renameTo(file)) { "Cannot save PDF" }
+                val document = Document(id, info.title, name, file.name, folderId, authors = info.authors, pageCount = pages)
+                dao.putDocument(document); document
+            } catch (e: Exception) { pending.delete(); file.delete(); throw e }
+            finally { source.delete() }
+        }
     }
     suspend fun saveEntry(entry: Entry, tagNames: String, collectionIds: Set<String>, readerFolderIds: Set<String>? = null) = database.withTransaction {
         val folders = dao.allCollections()

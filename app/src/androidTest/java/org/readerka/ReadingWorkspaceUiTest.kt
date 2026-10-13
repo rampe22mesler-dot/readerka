@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit
 @OptIn(ExperimentalTestApi::class)
 class ReadingWorkspaceUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     private val app get() = ApplicationProvider.getApplicationContext<ReaderkaApp>()
     private val dao get() = app.database.dao()
     private val vm get() = compose.runOnUiThread { ViewModelProvider(compose.activity)[LibraryViewModel::class.java] }
@@ -114,11 +115,12 @@ class ReadingWorkspaceUiTest {
         shortcut(KeyEvent.KEYCODE_DPAD_LEFT, 0); page(3)
         shortcut(KeyEvent.KEYCODE_DPAD_LEFT, 0); page(2)
         screenshot()
+        compose.onNodeWithTag("entry-comment").performClick()
         shortcut(KeyEvent.KEYCODE_S)
-        compose.waitUntil(30_000) { runBlocking { dao.allEntries().count { it.id == id } == 1 } && vm.workspace.value.editor == null }
+        compose.waitUntil(30_000) { runBlocking { dao.allEntries().count { it.id == id } == 1 } && vm.workspace.value.drafts.none { it.entry.id == id } }
         val entry = runBlocking { dao.allEntries().single { it.id == id } }
         assertEquals(documents.first().id, entry.documentId)
-        assertEquals("Мысль рядом с PDF\n**доказательство**", entry.comment)
+        assertEquals("Мысль рядом с PDF\n**доказательство**", entry.richText().text)
         assertFalse(vm.workspace.value.drafts.any { it.entry.id == id })
         shortcut(KeyEvent.KEYCODE_S)
         assertEquals(1, runBlocking { dao.allEntries().count { it.id == id } })
@@ -128,7 +130,7 @@ class ReadingWorkspaceUiTest {
         compose.onNodeWithTag("pdf-pages").performTouchInput { swipeUp(startY = height * .75f, endY = height * .60f, durationMillis = 600) }
         compose.waitUntil(30_000) { (vm.workspace.value.history.current?.offset ?: 0) > 0 }
         val first = vm.workspace.value.history.current!!
-        shortcut(KeyEvent.KEYCODE_O)
+        shortcut(KeyEvent.KEYCODE_P)
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("command-query").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("command-query").performTextInput(documents.last().title)
         compose.onNodeWithTag("command-source-" + documents.last().id).assertIsDisplayed().performClick()
@@ -151,12 +153,12 @@ class ReadingWorkspaceUiTest {
         compose.waitUntil(30_000) { vm.workspace.value.editor?.entry?.documentId == documents.last().id }
         compose.onNodeWithTag("entry-editor").assertIsDisplayed()
     }
-    @Test fun closedStandaloneDraftResumesFromToolbarAndCtrlEnterSavesInsideDialog() {
+    @Test fun closedStandaloneDraftResumesFromToolbarAndCtrlEnterSaves() {
         val title = "Standalone " + UUID.randomUUID().toString()
         var id: String? = null
         try {
             compose.runOnUiThread { vm.navigate("notes") }
-            compose.waitUntil(30_000) { compose.onAllNodesWithText("Создать заметку").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("catalogue-flat").fetchSemanticsNodes().isNotEmpty() }
             shortcut(KeyEvent.KEYCODE_N)
             compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("entry-title").performTextInput(title)
@@ -170,13 +172,8 @@ class ReadingWorkspaceUiTest {
             compose.onNodeWithTag("draft-" + id).performClick()
             compose.onNodeWithTag("entry-comment").assertTextContains("Незавершённая самостоятельная заметка")
             compose.onNodeWithTag("entry-comment").performClick()
-            compose.onNodeWithTag("entry-comment").performKeyInput {
-                keyDown(androidx.compose.ui.input.key.Key.CtrlLeft)
-                keyDown(androidx.compose.ui.input.key.Key.Enter)
-                keyUp(androidx.compose.ui.input.key.Key.Enter)
-                keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
-            }
-            compose.waitUntil(30_000) { runBlocking { dao.allEntries().any { it.id == id } } && vm.workspace.value.editor == null }
+            shortcut(KeyEvent.KEYCODE_ENTER)
+            compose.waitUntil(30_000) { runBlocking { dao.allEntries().any { it.id == id } } && vm.workspace.value.drafts.none { it.entry.id == id } }
             assertEquals(1, runBlocking { dao.allEntries().count { it.id == id } })
         } finally {
             id?.let { value -> runBlocking { compose.runOnUiThread { vm.discardDraft(value) }.join(); dao.deleteEntries(listOf(value)) } }

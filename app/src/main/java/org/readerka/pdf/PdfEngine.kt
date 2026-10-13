@@ -16,52 +16,6 @@ import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.*
 
-data class Glyph(val start: Int, val end: Int, val rect: PageRect)
-data class PageText(val page: Int, val text: String, val glyphs: List<Glyph>) {
-    fun wordAt(glyph: Int): IntRange {
-        require(glyph in glyphs.indices)
-        val offset = glyphs[glyph].start
-        val words = BreakIterator.getWordInstance(Locale.ROOT).apply { setText(this@PageText.text) }
-        val start = if (words.isBoundary(offset)) offset else words.preceding(offset)
-        val end = words.following(offset).takeIf { it != BreakIterator.DONE } ?: text.length
-        val first = glyphs.indexOfFirst { it.end > start }.coerceAtLeast(0)
-        val last = glyphs.indexOfLast { it.start < end }.coerceAtLeast(first)
-        return first..last
-    }
-    fun selection(first: Int, last: Int): Pair<String, Anchor>? {
-        if (glyphs.isEmpty()) return null
-        val a = min(first, last).coerceIn(glyphs.indices)
-        val b = max(first, last).coerceIn(glyphs.indices)
-        val start = glyphs[a].start
-        val end = glyphs[b].end
-        return text.substring(start, end) to Anchor(page, start, end, glyphs.subList(a, b + 1).map { it.rect })
-    }
-    fun hit(x: Float, y: Float): Int? {
-        val exact = glyphs.indexOfFirst { it.rect.contains(x, y) }
-        if (exact >= 0) return exact
-        return glyphs.indices.minByOrNull {
-            val r = glyphs[it].rect
-            hypot(x - x.coerceIn(r.left, r.right), y - y.coerceIn(r.top, r.bottom))
-        }?.takeIf {
-            val r = glyphs[it].rect
-            hypot(x - x.coerceIn(r.left, r.right), y - y.coerceIn(r.top, r.bottom)) < .025f
-        }
-    }
-    fun matches(query: String): List<Anchor> {
-        if (query.isBlank()) return emptyList()
-        val result = mutableListOf<Anchor>()
-        var from = 0
-        while (from < text.length) {
-            val at = text.indexOf(query, from, ignoreCase = true)
-            if (at < 0) break
-            val rects = glyphs.filter { it.end > at && it.start < at + query.length }.map { it.rect }
-            if (rects.isNotEmpty()) result += Anchor(page, at, at + query.length, rects)
-            from = at + query.length
-        }
-        return result
-    }
-}
-
 /** All operations are serialized: neither Android's renderer nor PDDocument is thread-safe. */
 class PdfEngine(file: File, cache: File) : Closeable {
     private val pdf = PDDocument.load(file, MemoryUsageSetting.setupMixed(16L * 1024 * 1024).setTempDir(cache))
@@ -77,6 +31,7 @@ class PdfEngine(file: File, cache: File) : Closeable {
     val pageCount: Int = pdf.numberOfPages
     init {
         try {
+            require(pageCount > 0) { "PDF не содержит страниц" }
             require(!pdf.isEncrypted) { "Encrypted PDFs are not supported" }
             descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
             try { renderer = PdfRenderer(descriptor) } catch (e: Exception) { descriptor.close(); throw e }
@@ -91,8 +46,10 @@ class PdfEngine(file: File, cache: File) : Closeable {
         val key = page to width.coerceIn(64, 2200)
         images[key]?.let { return@synchronized it }
         val rendered = renderer.openPage(page).use { p ->
-            val w = width.coerceIn(64, 2200)
-            val h = (w.toFloat() * p.height / p.width).roundToInt().coerceAtLeast(1)
+            require(p.width > 0 && p.height > 0) { "Некорректный размер страницы PDF" }
+            val ratio = p.height.toDouble() / p.width
+            val w = minOf(width.coerceIn(64, 2200), sqrt(4_000_000.0 / ratio).toInt(), (12000 / ratio).toInt()).coerceAtLeast(1)
+            val h = (w * ratio).roundToInt().coerceIn(1, 12000)
             val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             bitmap.eraseColor(Color.WHITE)
             p.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)

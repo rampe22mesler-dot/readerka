@@ -5,3 +5,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Readerka"
 include(":app")
+
+include(":shared")
+project(":shared").projectDir = file("windows/shared")

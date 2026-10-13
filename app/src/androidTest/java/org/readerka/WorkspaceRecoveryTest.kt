@@ -18,9 +18,54 @@ import org.junit.runner.RunWith
 import org.readerka.data.*
 import org.readerka.ui.LibraryViewModel
 import java.util.UUID
+import java.io.File
+import org.readerka.export.BackupArchive
+import org.readerka.pdf.PdfEngine
 
 @RunWith(AndroidJUnit4::class)
 class WorkspaceRecoveryTest {
+    @Test fun pendingPdfSelectionRecoversInFreshViewModelWithoutCreatingQuote() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
+        val dao = app.database.dao(); val disk = WorkspaceStore(app)
+        val previous = disk.values.first(); val previousSelections = disk.selections.first(); val previousViews = disk.views.first()
+        val id = UUID.randomUUID().toString()
+        val root = File(app.cacheDir, "selection-$id").apply { mkdirs() }
+        val staged = InstrumentationRegistry.getInstrumentation().context.assets.open("interop/to-android.zip").use { BackupArchive.stage(it, File(root, "source")) }
+        val document = staged.data.documents.single().copy(id = id, storedName = "$id.pdf", folderId = null)
+        val managed = File(app.filesDir, "pdfs/${document.storedName}").apply { parentFile!!.mkdirs() }
+        File(staged.directory, "pdfs/${staged.data.documents.single().storedName}").copyTo(managed)
+        val selection = PdfEngine(managed, app.cacheDir).use { engine -> val text = engine.text(1); text.selection(0, text.glyphs.lastIndex)!! }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var models = ViewModelStore()
+        fun fresh(): LibraryViewModel {
+            lateinit var value: LibraryViewModel
+            instrumentation.runOnMainSync { value = LibraryViewModel(app, SavedStateHandle()); models.put("selection", value) }
+            return value
+        }
+        try {
+            disk.save(WorkspaceState(), emptyMap(), emptyMap()); dao.putDocument(document)
+            var vm = fresh()
+            withTimeout(30_000) { vm.library.first { it.documents.any { d -> d.id == id } } }
+            instrumentation.runOnMainSync { vm.open(document, page = 1, pane = 0) }
+            withTimeout(30_000) { vm.readers.first { it[0]?.document?.id == id } }
+            val tab = vm.workspace.value.panes[0].selected!!
+            instrumentation.runOnMainSync { vm.rememberPdfSelection(tab.id, selection) }
+            val viewport = PdfViewState(2f, -.4f, -.2f)
+            instrumentation.runOnMainSync { vm.rememberPdfView(tab.id, 1, viewport) }
+            withTimeout(30_000) { disk.selections.first { it[tab.id] == selection } }
+            withTimeout(30_000) { disk.views.first { it["${tab.id}:1"] == viewport } }
+            instrumentation.runOnMainSync { models.clear() }; models = ViewModelStore(); vm = fresh()
+            withTimeout(30_000) { vm.pdfSelections.first { it[tab.id] == selection } }
+            withTimeout(30_000) { vm.readers.first { it[0]?.document?.id == id } }
+            assertEquals(1, vm.readers.value[0]!!.page)
+            assertEquals(selection, vm.pdfSelections.value[tab.id])
+            assertEquals(viewport, vm.pdfViews.value["${tab.id}:1"])
+            assertTrue(dao.allEntries().none { it.documentId == id })
+        } finally {
+            instrumentation.runOnMainSync { models.clear() }
+            disk.save(previous, previousSelections, previousViews); dao.deleteDocument(id); managed.delete(); root.deleteRecursively()
+        }
+    }
     @Test fun typingWhileManualSaveWaitsForDatabaseRetainsTheNewerDraft() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
         val disk = WorkspaceStore(app); val previous = disk.values.first()

@@ -12,8 +12,24 @@ import androidx.compose.ui.unit.dp
 data class AppShortcut(val action: String, val label: String, val keys: String, val code: Int, val ctrl: Boolean = false, val alt: Boolean = false, val shift: Boolean = false)
 object AppShortcuts {
     val global = listOf(
+        AppShortcut("graph", "Граф библиотеки", "Ctrl+Shift+G", KeyEvent.KEYCODE_G, ctrl = true, shift = true),
+        AppShortcut("split", "Две области", "Ctrl+Alt+S", KeyEvent.KEYCODE_S, ctrl = true, alt = true),
+        AppShortcut("right", "Открыть справа", "Ctrl+Alt+O", KeyEvent.KEYCODE_O, ctrl = true, alt = true),
+        AppShortcut("collapse", "Закрыть вторую область", "Ctrl+Alt+W", KeyEvent.KEYCODE_W, ctrl = true, alt = true),
+        AppShortcut("focus-pane", "Перейти в другую область", "F6", KeyEvent.KEYCODE_F6),
+        AppShortcut("import-zip", "Импорт ZIP", "Ctrl+Shift+O", KeyEvent.KEYCODE_O, ctrl = true, shift = true),
+        AppShortcut("export-zip", "Экспорт ZIP", "Ctrl+Shift+E", KeyEvent.KEYCODE_E, ctrl = true, shift = true),
+        AppShortcut("save-all", "Сохранить всё", "Ctrl+Shift+S", KeyEvent.KEYCODE_S, ctrl = true, shift = true),
+        AppShortcut("return", "Вернуться к записи", "Alt+↑", KeyEvent.KEYCODE_DPAD_UP, alt = true),
+        AppShortcut("bookmark", "Добавить закладку", "Ctrl+D", KeyEvent.KEYCODE_D, ctrl = true),
+        AppShortcut("bookmarks", "Закладки книги", "Ctrl+Alt+B", KeyEvent.KEYCODE_B, ctrl = true, alt = true),
+        AppShortcut("quotes", "Цитаты книги", "Ctrl+Alt+Q", KeyEvent.KEYCODE_Q, ctrl = true, alt = true),
+        AppShortcut("book-consp", "Конспекты книги", "Ctrl+Alt+C", KeyEvent.KEYCODE_C, ctrl = true, alt = true),
+        AppShortcut("quote", "Цитата из выделения", "Ctrl+Shift+Q", KeyEvent.KEYCODE_Q, ctrl = true, shift = true),
+        AppShortcut("append-consp", "Добавить в конспект", "Ctrl+Alt+A", KeyEvent.KEYCODE_A, ctrl = true, alt = true),
+        AppShortcut("field-insert", "Добавить на поле", "Ctrl+Alt+L", KeyEvent.KEYCODE_L, ctrl = true, alt = true),
         AppShortcut("commands", "Команды", "Ctrl+P", KeyEvent.KEYCODE_P, ctrl = true),
-        AppShortcut("sources", "Открыть PDF", "Ctrl+O", KeyEvent.KEYCODE_O, ctrl = true),
+        AppShortcut("import-book", "Добавить книгу", "Ctrl+O", KeyEvent.KEYCODE_O, ctrl = true),
         AppShortcut("note", "Создать заметку", "Ctrl+N", KeyEvent.KEYCODE_N, ctrl = true),
         AppShortcut("consp", "Создать конспект", "Ctrl+Shift+N", KeyEvent.KEYCODE_N, ctrl = true, shift = true),
         AppShortcut("save", "Сохранить запись", "Ctrl+S", KeyEvent.KEYCODE_S, ctrl = true),
@@ -30,6 +46,13 @@ object AppShortcuts {
         AppShortcut("escape", "Выйти из полного экрана / закрыть окно", "Esc", KeyEvent.KEYCODE_ESCAPE)
     )
     val editor = listOf(
+        AppShortcut("insert", "Каталог вставки", "Ctrl+Shift+K", KeyEvent.KEYCODE_K, ctrl = true, shift = true),
+        AppShortcut("preview", "Режим чтения", "Ctrl+Shift+P", KeyEvent.KEYCODE_P, ctrl = true, shift = true),
+        AppShortcut("properties", "Свойства записи", "Alt+Enter", KeyEvent.KEYCODE_ENTER, alt = true),
+        AppShortcut("heading-1", "Заголовок 1", "Ctrl+Alt+1", KeyEvent.KEYCODE_1, ctrl = true, alt = true),
+        AppShortcut("heading-2", "Заголовок 2", "Ctrl+Alt+2", KeyEvent.KEYCODE_2, ctrl = true, alt = true),
+        AppShortcut("heading-3", "Заголовок 3", "Ctrl+Alt+3", KeyEvent.KEYCODE_3, ctrl = true, alt = true),
+        AppShortcut("paragraph", "Обычный абзац", "Ctrl+Alt+0", KeyEvent.KEYCODE_0, ctrl = true, alt = true),
         AppShortcut("bold", "Жирный", "Ctrl+B", KeyEvent.KEYCODE_B, ctrl = true),
         AppShortcut("italic", "Курсив", "Ctrl+I", KeyEvent.KEYCODE_I, ctrl = true),
         AppShortcut("underline", "Подчёркивание", "Ctrl+U", KeyEvent.KEYCODE_U, ctrl = true),
@@ -41,7 +64,7 @@ object AppShortcuts {
     )
     val pdfKeys = mapOf(KeyEvent.KEYCODE_DPAD_RIGHT to 1, KeyEvent.KEYCODE_DPAD_DOWN to 1, KeyEvent.KEYCODE_PAGE_DOWN to 1,
         KeyEvent.KEYCODE_DPAD_LEFT to -1, KeyEvent.KEYCODE_DPAD_UP to -1, KeyEvent.KEYCODE_PAGE_UP to -1, KeyEvent.KEYCODE_MOVE_HOME to Int.MIN_VALUE, KeyEvent.KEYCODE_MOVE_END to Int.MAX_VALUE)
-    fun match(event: KeyEvent, editorContext: Boolean = false): AppShortcut? = (if (editorContext) editor else global).firstOrNull {
+    fun match(event: KeyEvent, editorContext: Boolean = false): AppShortcut? = if (event.isCtrlPressed && event.isAltPressed && event.unicodeChar >= 32) null else (if (editorContext) editor else global).firstOrNull {
         event.keyCode == it.code && event.isCtrlPressed == it.ctrl && event.isAltPressed == it.alt && event.isShiftPressed == it.shift && !event.isMetaPressed
     }
 }

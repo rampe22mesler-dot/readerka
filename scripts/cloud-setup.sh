@@ -46,10 +46,9 @@ if proxy.hostname:
 cert = os.environ.get('CODEX_PROXY_CERT')
 if cert and pathlib.Path(cert).is_file():
     trust = root/'jdk-proxy-trust.jks'
-    if not trust.exists():
-        import shutil
-        shutil.copyfile(pathlib.Path(os.environ['JAVA_HOME'])/'lib/security/cacerts', trust)
-        subprocess.run([str(pathlib.Path(os.environ['JAVA_HOME'])/'bin/keytool'), '-importcert','-noprompt','-alias','readerka-cloud-proxy','-file',cert,'-keystore',str(trust),'-storepass','changeit'],check=True,capture_output=True)
+    import shutil
+    shutil.copyfile(pathlib.Path(os.environ['JAVA_HOME'])/'lib/security/cacerts', trust)
+    subprocess.run([str(pathlib.Path(os.environ['JAVA_HOME'])/'bin/keytool'), '-importcert','-noprompt','-alias','readerka-cloud-proxy','-file',cert,'-keystore',str(trust),'-storepass','changeit'],check=True,capture_output=True)
     props['javax.net.ssl.trustStore'] = str(trust)
     props['javax.net.ssl.trustStorePassword'] = 'changeit'
 (root/'java-network-options').write_text(' '.join(shlex.quote(f'-D{k}={v}') for k,v in props.items()))
@@ -61,6 +60,6 @@ gp.write_text('\n'.join(lines + [f'systemProp.{k}={v}' for k,v in props.items()]
 PY
 export JAVA_OPTS="$(cat "$tools_dir/java-network-options")"
 (yes 2>/dev/null || true) | sdkmanager --sdk_root="$ANDROID_HOME" --licenses > "$tools_dir/downloads/licenses.log"
-sdkmanager --sdk_root="$ANDROID_HOME" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+sdkmanager --sdk_root="$ANDROID_HOME" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools' 'ndk;26.3.11579264' 'emulator' 'system-images;android-28;default;x86_64' 'system-images;android-30;default;x86_64'
 if [[ ! -f local.properties ]]; then printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties; fi
 ./gradlew assembleDebug testDebugUnitTest --console=plain

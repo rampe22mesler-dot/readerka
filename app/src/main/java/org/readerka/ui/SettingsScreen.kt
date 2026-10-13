@@ -44,6 +44,8 @@ import org.readerka.export.*
         Text(stringResource(R.string.restore_explanation), modifier = Modifier.widthIn(max = 650.dp))
         TextButton(onClick = onRestore) { Text(stringResource(R.string.restore)) }
         HorizontalDivider()
+        DropboxSection(vm)
+        HorizontalDivider()
         Text(stringResource(R.string.keyboard_shortcuts), style = MaterialTheme.typography.bodySmall)
         Text(stringResource(R.string.offline_notice), style = MaterialTheme.typography.bodySmall)
     }

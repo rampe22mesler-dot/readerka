@@ -15,6 +15,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class FolderWorkspaceUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     private val dao get() = ApplicationProvider.getApplicationContext<ReaderkaApp>().database.dao()
     private fun sidebar(tag: String) = compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("workspace-sidebar")))
     private fun waitSidebar(tag: String) {
@@ -50,39 +51,40 @@ class FolderWorkspaceUiTest {
         try {
             compose.onNodeWithContentDescription("Заметки и цитаты").performClick()
             compose.onNodeWithContentDescription("Папки заметок").performClick()
-            sidebar("create-root-folder").performClick()
+            compose.onNode(hasContentDescription("Создать папку") and hasAnyAncestor(hasTestTag("workspace-sidebar"))).performClick()
             compose.onNodeWithText("Название").performTextInput(rootName)
             compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(30_000) { runBlocking { dao.allCollections().any { it.name == rootName } } }
             val root = runBlocking { dao.allCollections().first { it.name == rootName } }
-            waitSidebar("folder-menu-" + root.id)
-            sidebar("folder-menu-" + root.id).performClick()
+            waitSidebar("explorer-menu-f:" + root.id)
+            sidebar("explorer-menu-f:" + root.id).performClick()
             compose.onNodeWithText("Создать подпапку").performClick()
             compose.onNodeWithText("Название").performTextInput(childName)
             compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(30_000) { runBlocking { dao.allCollections().any { it.name == childName } } }
             val child = runBlocking { dao.allCollections().first { it.name == childName } }
             assertEquals(root.id, child.parentId)
-            waitSidebar("select-folder-" + child.id)
-            sidebar("select-folder-" + child.id).assertIsDisplayed()
-            sidebar("expand-folder-" + root.id).performClick()
-            sidebar("select-folder-" + child.id).assertDoesNotExist()
-            sidebar("folder-search").performTextInput(childName)
-            sidebar("select-folder-" + child.id).assertIsDisplayed()
-            sidebar("select-folder-" + root.id).assertIsDisplayed()
-            sidebar("folder-search").performTextClearance()
-            sidebar("create-root-folder").performClick()
+            waitSidebar("explorer-f:" + child.id)
+            sidebar("explorer-f:" + child.id).assertIsDisplayed()
+            sidebar("explorer-expand-" + root.id).performClick()
+            sidebar("explorer-f:" + child.id).assertDoesNotExist()
+            sidebar("explorer-search").performTextInput(childName)
+            sidebar("explorer-f:" + child.id).assertIsDisplayed()
+            sidebar("explorer-f:" + root.id).assertIsDisplayed()
+            sidebar("explorer-search").performTextClearance()
+            compose.onNode(hasContentDescription("Создать папку") and hasAnyAncestor(hasTestTag("workspace-sidebar"))).performClick()
             compose.onNodeWithText("Название").performTextInput(otherName)
             compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(30_000) { runBlocking { dao.allCollections().any { it.name == otherName } } }
             val other = runBlocking { dao.allCollections().first { it.name == otherName } }
             assertNull(other.parentId)
-            waitSidebar("select-folder-" + other.id)
+            waitSidebar("explorer-f:" + other.id)
             compose.onNodeWithText("Создать заметку").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("entry-title").performTextInput(title)
             compose.onNodeWithTag("entry-comment").performTextInput("Shared between two branches")
-            compose.onNodeWithText("Папки заметок", substring = true).performScrollTo().performClick()
+            compose.onNodeWithTag("note-properties").performClick()
+            compose.onNodeWithTag("entry-collections").performScrollTo().performClick()
             dialog("expand-folder-" + root.id).performClick()
             dialog("select-folder-" + child.id).performClick()
             dialog("select-folder-" + other.id).performClick()
@@ -92,15 +94,17 @@ class FolderWorkspaceUiTest {
             val entry = runBlocking { dao.allEntries().single { it.title == title } }
             compose.waitUntil(30_000) { runBlocking { dao.allMemberships().count { it.entryId == entry.id } == 2 } }
             compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-editor").fetchSemanticsNodes().isEmpty() }
-            sidebar("select-folder-" + root.id).performClick()
-            compose.onNodeWithText(title).assertIsDisplayed()
+            sidebar("explorer-expand-" + root.id).performClick()
+            waitSidebar("explorer-f:" + child.id)
+            sidebar("explorer-f:" + child.id).performClick()
+            compose.onAllNodesWithText(title).filter(hasAnyAncestor(hasTestTag("catalogue-list"))).onFirst().assertIsDisplayed()
             savePreview()
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithText(title).assertIsDisplayed()
+            compose.onNode(hasText(title) and hasAnyAncestor(hasTestTag("catalogue-list"))).assertIsDisplayed()
             assertEquals(setOf(child.id, other.id), runBlocking { dao.allMemberships().filter { it.entryId == entry.id }.map { it.collectionId }.toSet() })
             // Renaming/reparenting does not copy the canonical entry or remove its memberships.
-            sidebar("folder-menu-" + child.id).performClick()
-            compose.onNodeWithText("Редактировать папку").performClick()
+            sidebar("explorer-menu-f:" + child.id).performClick()
+            compose.onNodeWithText("Переместить / удалить папку").performClick()
             compose.onNodeWithText("Название").performTextClearance()
             compose.onNodeWithText("Название").performTextInput("Renamed $token")
             compose.onNodeWithText("Родительская папка: $rootName").performClick()
@@ -135,12 +139,12 @@ class FolderWorkspaceUiTest {
             compose.onNodeWithTag("option-search").performTextInput("Author 0 $token")
             compose.onNodeWithTag("search-option-" + docs.first().id).assertIsDisplayed().performClick()
             compose.onNodeWithText("Закрыть").performClick()
-            compose.onNodeWithText("Older quote $token").assertIsDisplayed()
-            compose.onNodeWithText("Recent quote $token").assertDoesNotExist()
+            compose.onNode(hasText("Older quote $token") and hasAnyAncestor(hasTestTag("catalogue-list"))).assertIsDisplayed()
+            compose.onNode(hasText("Recent quote $token") and hasAnyAncestor(hasTestTag("catalogue-list"))).assertDoesNotExist()
             compose.onNodeWithText("Фильтры").performClick()
-            compose.onNodeWithText("Сбросить фильтры").performScrollTo().performClick()
+            compose.onNode(hasText("Сбросить фильтры") and hasAnyAncestor(isDialog())).performScrollTo().performClick()
             compose.onNodeWithText("Закрыть").performClick()
-            compose.onNodeWithText("Recent quote $token").assertIsDisplayed()
+            compose.onNode(hasText("Recent quote $token") and hasAnyAncestor(hasTestTag("catalogue-list"))).assertIsDisplayed()
         } finally { runBlocking { dao.deleteEntries(entries.map { it.id }); docs.forEach { dao.deleteDocument(it.id) } } }
     }
 }

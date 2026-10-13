@@ -22,6 +22,8 @@ import org.readerka.data.*
 
 class ResearchEditText(context: Context) : EditText(context) {
     var updating = false
+    var styledValue: RichText? = null
+    var styledAccent: Int? = null
     var selectionObserver: ((Int, Int) -> Unit)? = null
     override fun onSelectionChanged(start: Int, end: Int) { super.onSelectionChanged(start, end); if (!updating) selectionObserver?.invoke(start, end) }
 }
@@ -30,7 +32,7 @@ class ResearchEditText(context: Context) : EditText(context) {
     onFocus: () -> Unit, onView: (ResearchEditText) -> Unit, modifier: Modifier = Modifier) {
     val foreground = MaterialTheme.colorScheme.onSurface.toArgb()
     val accent = MaterialTheme.colorScheme.primary.toArgb()
-    val scale = LocalDensity.current.fontScale
+    val fontPixels = with(LocalDensity.current) { 17f * density * fontScale }
     val currentValue by rememberUpdatedState(value)
     val change by rememberUpdatedState(onChange)
     val select by rememberUpdatedState(onSelection)
@@ -49,7 +51,7 @@ class ResearchEditText(context: Context) : EditText(context) {
         view = this; onView(this)
         gravity = Gravity.TOP or Gravity.START
         inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        setTextSize(17f * scale); setPadding(0, 8, 0, 24); setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, fontPixels); setPadding(0, 8, 0, 24); setBackgroundColor(android.graphics.Color.TRANSPARENT)
         minLines = 12; isVerticalScrollBarEnabled = false
         contentDescription = "Текст конспекта"
         setOnFocusChangeListener { _, focused -> nativeFocused = focused; if (focused) onFocus() }
@@ -59,47 +61,55 @@ class ResearchEditText(context: Context) : EditText(context) {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 if (!updating) {
+                    styledValue = null
                     val next = currentValue.changeText(s.toString())
                     change(next, TextRange(selectionStart.coerceAtLeast(0), selectionEnd.coerceAtLeast(0)))
                 }
             }
         })
     } }, update = { editor ->
-        editor.setTextColor(foreground); editor.setTextSize(17f * scale)
+        if (editor.currentTextColor != foreground) editor.setTextColor(foreground)
+        if (editor.textSize != fontPixels) editor.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, fontPixels)
         editor.updating = true
-        if (editor.text.toString() != value.text) editor.setText(value.text)
+        if (editor.text.toString() != value.text) { editor.setText(value.text); editor.styledValue = null }
         val editable = editor.text
-        editable.getSpans(0, editable.length, CharacterStyle::class.java).forEach { editable.removeSpan(it) }
-        editable.getSpans(0, editable.length, ParagraphStyle::class.java).forEach { editable.removeSpan(it) }
-        fun span(mark: TextMark, value: Any) { if (mark.start >= 0 && mark.end <= editable.length) editable.setSpan(value, mark.start, mark.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-        value.marks.forEach { mark -> when (mark.style) {
-            TextStyle.Bold -> span(mark, StyleSpan(Typeface.BOLD))
-            TextStyle.Italic -> span(mark, StyleSpan(Typeface.ITALIC))
-            TextStyle.Underline -> span(mark, UnderlineSpan())
-            TextStyle.Code, TextStyle.Literal -> span(mark, TypefaceSpan("monospace"))
-            TextStyle.Link -> { span(mark, UnderlineSpan()); span(mark, ForegroundColorSpan(accent)) }
-        } }
-        value.blocks.forEach { block ->
-            val end = value.blockEnd(block)
-            val paragraphEnd = if (end < editable.length) end + 1 else end
-            if (end > block.start && block.style in listOf(BlockStyle.Bullet, BlockStyle.Ordered, BlockStyle.Quote)) {
-                val marker: ParagraphStyle = when (block.style) {
-                    BlockStyle.Bullet -> BulletSpan(12, accent)
-                    BlockStyle.Quote -> QuoteSpan(accent)
-                    else -> object : LeadingMarginSpan {
-                        val number = value.blocks.takeWhile { it.start <= block.start }.takeLastWhile { it.style == BlockStyle.Ordered }.size
-                        override fun getLeadingMargin(first: Boolean) = 40
-                        override fun drawLeadingMargin(canvas: android.graphics.Canvas, paint: android.graphics.Paint, x: Int, dir: Int, top: Int, baseline: Int, bottom: Int, text: CharSequence, start: Int, end: Int, first: Boolean, layout: android.text.Layout) { if (first) canvas.drawText("$number.", x.toFloat(), baseline.toFloat(), paint) }
+        if (editor.styledValue != value || editor.styledAccent != accent) {
+            editable.getSpans(0, editable.length, CharacterStyle::class.java).forEach {
+                if (editable.getSpanFlags(it) and Spanned.SPAN_COMPOSING == 0) editable.removeSpan(it)
+            }
+            editable.getSpans(0, editable.length, ParagraphStyle::class.java).forEach { editable.removeSpan(it) }
+            fun span(mark: TextMark, value: Any) { if (mark.start >= 0 && mark.end <= editable.length) editable.setSpan(value, mark.start, mark.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+            value.marks.forEach { mark -> when (mark.style) {
+                TextStyle.Bold -> span(mark, StyleSpan(Typeface.BOLD))
+                TextStyle.Italic -> span(mark, StyleSpan(Typeface.ITALIC))
+                TextStyle.Underline -> span(mark, UnderlineSpan())
+                TextStyle.Code, TextStyle.Literal -> span(mark, TypefaceSpan("monospace"))
+                TextStyle.Link -> { span(mark, UnderlineSpan()); span(mark, ForegroundColorSpan(accent)) }
+            } }
+            value.blocks.forEach { block ->
+                val end = value.blockEnd(block)
+                val paragraphEnd = if (end < editable.length) end + 1 else end
+                if (end > block.start && block.style in listOf(BlockStyle.Bullet, BlockStyle.Ordered, BlockStyle.Quote)) {
+                    val marker: ParagraphStyle = when (block.style) {
+                        BlockStyle.Bullet -> BulletSpan(12, accent)
+                        BlockStyle.Quote -> QuoteSpan(accent)
+                        else -> object : LeadingMarginSpan {
+                            val number = value.blocks.takeWhile { it.start <= block.start }.takeLastWhile { it.style == BlockStyle.Ordered }.size
+                            override fun getLeadingMargin(first: Boolean) = 40
+                            override fun drawLeadingMargin(canvas: android.graphics.Canvas, paint: android.graphics.Paint, x: Int, dir: Int, top: Int, baseline: Int, bottom: Int, text: CharSequence, start: Int, end: Int, first: Boolean, layout: android.text.Layout) { if (first) canvas.drawText("$number.", x.toFloat(), baseline.toFloat(), paint) }
+                        }
                     }
+                    editable.setSpan(marker, block.start, paragraphEnd, Spanned.SPAN_PARAGRAPH)
                 }
-                editable.setSpan(marker, block.start, paragraphEnd, Spanned.SPAN_PARAGRAPH)
+                if (end > block.start) when (block.style) {
+                    BlockStyle.Heading -> { editable.setSpan(RelativeSizeSpan(when (block.level) { 1 -> 1.6f; 2 -> 1.35f; else -> 1.15f }), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); editable.setSpan(StyleSpan(Typeface.BOLD), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+                    BlockStyle.LinkCard -> { editable.setSpan(BackgroundColorSpan(accent and 0x00ffffff or 0x18000000), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); editable.setSpan(ForegroundColorSpan(accent), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+                    BlockStyle.Code -> editable.setSpan(TypefaceSpan("monospace"), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    else -> Unit
+                }
             }
-            if (end > block.start) when (block.style) {
-                BlockStyle.Heading -> { editable.setSpan(RelativeSizeSpan(when (block.level) { 1 -> 1.6f; 2 -> 1.35f; else -> 1.15f }), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); editable.setSpan(StyleSpan(Typeface.BOLD), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-                BlockStyle.LinkCard -> { editable.setSpan(BackgroundColorSpan(accent and 0x00ffffff or 0x18000000), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); editable.setSpan(ForegroundColorSpan(accent), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
-                BlockStyle.Code -> editable.setSpan(TypefaceSpan("monospace"), block.start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                else -> Unit
-            }
+            editor.styledValue = value
+            editor.styledAccent = accent
         }
         val start = selection.start.coerceIn(0, editable.length); val end = selection.end.coerceIn(0, editable.length)
         if (editor.selectionStart != start || editor.selectionEnd != end) editor.setSelection(start, end)

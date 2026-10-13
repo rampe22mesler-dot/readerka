@@ -41,7 +41,8 @@ class CollectionStructureTest {
         try {
             val oldBytes = ByteArrayOutputStream().also { BackupArchive.write(it, legacy) { error("No PDFs") } }.toByteArray()
             val separated = BackupArchive.stage(oldBytes.inputStream(), File(temp, "old")).data
-            assertEquals(legacy.separateLegacyCollections(), separated)
+            assertEquals(legacy.migrateResearchFields(), separated)
+            assertEquals(5, separated.version)
             val newBytes = ByteArrayOutputStream().also { BackupArchive.write(it, separated) { error("No PDFs") } }.toByteArray()
             assertEquals(separated, BackupArchive.stage(newBytes.inputStream(), File(temp, "new")).data)
         } finally { temp.deleteRecursively() }

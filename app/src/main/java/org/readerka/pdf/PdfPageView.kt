@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import org.readerka.data.Anchor
 import org.readerka.data.Entry
+import org.readerka.data.PdfViewState
 
 /** A page canvas whose image, highlights and selection use the same normalized transform. */
 class PdfPageView(context: Context) : View(context) {
@@ -23,6 +24,8 @@ class PdfPageView(context: Context) : View(context) {
     var onHighlight: (Entry) -> Unit = {}
     var onCenterTap: () -> Unit = {}
     var onPaneFocus: () -> Unit = {}
+    var onViewport: (PdfViewState) -> Unit = {}
+    private var desiredViewport: PdfViewState? = null
     var onNavigationKey: (KeyEvent) -> Boolean = { false }
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
@@ -45,6 +48,8 @@ class PdfPageView(context: Context) : View(context) {
     private val drawingRect = RectF()
     private var cachedSelection: Pair<String, Anchor>? = null
     private val handler = Handler(Looper.getMainLooper())
+    private var lastMouseClick = 0L
+    private var lastMousePoint = PointF()
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val longPress = Runnable {
         val hit = hit(downX, downY) ?: return@Runnable
@@ -66,24 +71,54 @@ class PdfPageView(context: Context) : View(context) {
             val ratio = zoom / old
             panX = detector.focusX - (detector.focusX - panX) * ratio
             panY = detector.focusY - (detector.focusY - panY) * ratio
-            clampPan(); invalidate()
+            clampPan(); notifyViewport(); invalidate()
             return true
         }
     })
     init { isClickable = true; isFocusable = true; isFocusableInTouchMode = true; setOnKeyListener { _, _, event -> onNavigationKey(event) } }
-    fun clearSelection() { startGlyph = null; endGlyph = null; initialWord = null; cachedSelection = null; selecting = false; invalidate() }
-    fun reset() { handler.removeCallbacksAndMessages(null); parent?.requestDisallowInterceptTouchEvent(false); clearSelection(); fitWidth(); bitmap = null; pageText = null; highlights = emptyList() }
-    fun fitWidth() { zoom = 1f; panX = 0f; panY = 0f; invalidate() }
-    fun setZoom(value: Float) { zoom = value.coerceIn(1f, 5f); clampPan(); invalidate() }
+    fun clearSelection() { handler.removeCallbacks(longPress); startGlyph = null; endGlyph = null; initialWord = null; cachedSelection = null; selecting = false; invalidate() }
+    fun restoreSelection(value: Pair<String, Anchor>?) {
+        // Compose may update during a drag before ACTION_UP publishes its new anchor.
+        // Restoring the previous saved value must not cancel the active gesture.
+        if (selecting) return
+        if (value == cachedSelection) return
+        if (value == null) { clearSelection(); return }
+        val text = pageText ?: return
+        val anchor = value.second
+        if (text.page != anchor.page) return
+        val first = text.glyphs.indexOfFirst { it.end > anchor.start }
+        val last = text.glyphs.indexOfLast { it.start < anchor.end }
+        if (first < 0 || last < first) return
+        startGlyph = first; endGlyph = last; initialWord = null; cachedSelection = value; invalidate()
+    }
+    fun reset() { onViewport = {}; desiredViewport = null; handler.removeCallbacksAndMessages(null); parent?.requestDisallowInterceptTouchEvent(false); clearSelection(); fitWidth(); desiredViewport = null; bitmap = null; pageText = null; highlights = emptyList() }
+    fun fitWidth() { zoom = 1f; panX = 0f; panY = 0f; notifyViewport(); invalidate() }
+    fun setZoom(value: Float) { zoom = value.coerceIn(1f, 5f); clampPan(); notifyViewport(); invalidate() }
+    private fun notifyViewport() {
+        if (width > 0 && height > 0) PdfViewState(zoom, panX / width, panY / height).let { desiredViewport = it; onViewport(it) }
+    }
+    fun restoreViewport(value: PdfViewState) {
+        if (!value.zoom.isFinite() || !value.panX.isFinite() || !value.panY.isFinite()) return
+        desiredViewport = value
+        if (width > 0 && height > 0) {
+            zoom = value.zoom.coerceIn(1f, 5f); panX = value.panX * width; panY = value.panY * height
+            clampPan(); invalidate()
+        }
+    }
     private fun clampPan() {
         panX = panX.coerceIn(width * (1f - zoom), 0f)
         panY = panY.coerceIn(height * (1f - zoom), 0f)
     }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (oldw > 0) panX *= w.toFloat() / oldw
-        if (oldh > 0) panY *= h.toFloat() / oldh
-        clampPan(); invalidate()
+        val wanted = desiredViewport
+        if (wanted != null) restoreViewport(wanted)
+        else {
+            if (oldw > 0) panX *= w.toFloat() / oldw
+            if (oldh > 0) panY *= h.toFloat() / oldh
+            clampPan(); invalidate()
+        }
+        notifyViewport()
     }
     fun screenRect(rect: org.readerka.data.PageRect) = RectF(
         panX + rect.left * width * zoom, panY + rect.top * height * zoom,
@@ -132,7 +167,18 @@ class PdfPageView(context: Context) : View(context) {
                     val sr = screenRect(r)
                     kotlin.math.hypot(event.x - sr.centerX(), event.y - (sr.bottom + 10 * resources.displayMetrics.density)) < 28 * resources.displayMetrics.density
                 }
-                if (at >= 0) { initialWord = null; selecting = true; movingStart = at == 0; parent?.requestDisallowInterceptTouchEvent(true) }
+                val mouse = event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE
+                if (mouse) {
+                    val hit = hit(event.x, event.y)
+                    val double = event.eventTime - lastMouseClick in 1..ViewConfiguration.getDoubleTapTimeout().toLong() && kotlin.math.hypot(event.x - lastMousePoint.x, event.y - lastMousePoint.y) < slop * 2
+                    lastMouseClick = event.eventTime; lastMousePoint = PointF(event.x, event.y)
+                    if (hit != null) {
+                        val word = if (double || event.buttonState and MotionEvent.BUTTON_SECONDARY != 0) pageText?.wordAt(hit) else null
+                        startGlyph = word?.first ?: hit; endGlyph = word?.last ?: hit; initialWord = word
+                        selecting = true; movingStart = false; parent?.requestDisallowInterceptTouchEvent(true)
+                        notifySelection()
+                    }
+                } else if (at >= 0) { initialWord = null; selecting = true; movingStart = at == 0; parent?.requestDisallowInterceptTouchEvent(true) }
                 else { selecting = false; handler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong()) }
                 if (zoom > 1f) parent?.requestDisallowInterceptTouchEvent(true)
             }
@@ -147,7 +193,7 @@ class PdfPageView(context: Context) : View(context) {
                     notifySelection()
                 } else {
                     if (kotlin.math.hypot(event.x - downX, event.y - downY) > slop) handler.removeCallbacks(longPress)
-                    if (zoom > 1f) { panX += event.x - lastX; panY += event.y - lastY; clampPan(); invalidate() }
+                    if (zoom > 1f) { panX += event.x - lastX; panY += event.y - lastY; clampPan(); notifyViewport(); invalidate() }
                 }
                 lastX = event.x; lastY = event.y
             }
@@ -167,6 +213,17 @@ class PdfPageView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> { handler.removeCallbacks(longPress); selecting = false; parent?.requestDisallowInterceptTouchEvent(false) }
         }
         return true
+    }
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_SCROLL) {
+            val amount = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            if ((event.metaState and android.view.KeyEvent.META_CTRL_ON != 0)) { setZoom((zoom * Math.pow(1.15, amount.toDouble()).toFloat()).coerceIn(1f, 5f)); return true }
+            if ((event.metaState and android.view.KeyEvent.META_SHIFT_ON != 0) || event.getAxisValue(MotionEvent.AXIS_HSCROLL) != 0f) {
+                panX += (if ((event.metaState and android.view.KeyEvent.META_SHIFT_ON != 0)) amount else event.getAxisValue(MotionEvent.AXIS_HSCROLL)) * 48 * resources.displayMetrics.density
+                clampPan(); notifyViewport(); invalidate(); return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
     }
     override fun performClick(): Boolean { super.performClick(); return true }
     override fun onDetachedFromWindow() { handler.removeCallbacksAndMessages(null); super.onDetachedFromWindow() }

@@ -10,6 +10,21 @@ import kotlinx.serialization.json.Json
 
 @Dao
 abstract class LibraryDao {
+    @Query("SELECT * FROM research_fields ORDER BY id") abstract suspend fun allResearchFields(): List<ResearchFieldRow>
+    @Upsert abstract suspend fun putResearchField(value: ResearchFieldRow)
+    @Query("DELETE FROM research_fields WHERE id = :id") abstract suspend fun deleteResearchField(id: String)
+    @Query("SELECT COUNT(*) FROM import_receipts WHERE id = :id") abstract suspend fun importCommitted(id: String): Int
+    @Query("SELECT * FROM import_receipts") abstract suspend fun allImportReceipts(): List<ImportReceipt>
+    @Insert abstract suspend fun putImportReceipt(value: ImportReceipt)
+    @Query("DELETE FROM import_receipts WHERE id = :id") abstract suspend fun deleteImportReceipt(id: String)
+    @Query("DELETE FROM research_fields") abstract suspend fun clearResearchFields()
+    @Query("DELETE FROM entries") abstract suspend fun clearEntries()
+    @Query("DELETE FROM bookmarks") abstract suspend fun clearBookmarks()
+    @Query("DELETE FROM reader_folders") abstract suspend fun clearReaderFolders()
+    @Query("DELETE FROM documents") abstract suspend fun clearDocuments()
+    @Query("DELETE FROM collections") abstract suspend fun clearCollections()
+    @Query("DELETE FROM document_folders") abstract suspend fun clearFolders()
+    @Query("DELETE FROM tags") abstract suspend fun clearTags()
     @Query("SELECT * FROM note_versions ORDER BY createdAt DESC") abstract suspend fun allNoteVersions(): List<NoteVersion>
     @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun putNoteVersion(value: NoteVersion)
     @Query("DELETE FROM note_versions WHERE entryId = :id AND id NOT IN (SELECT id FROM note_versions WHERE entryId = :id ORDER BY createdAt DESC LIMIT 30)") abstract suspend fun pruneVersions(id: String)
@@ -62,15 +77,40 @@ abstract class LibraryDao {
         documents = allDocuments(), documentFolders = allDocumentFolders(), entries = allEntries(),
         collections = allCollections(), memberships = allMemberships(), tags = allTags(),
         entryTags = allEntryTags(), documentTags = allDocumentTags(), bookmarks = allBookmarks(),
-        readerFolders = allReaderFolders(), readerMemberships = allReaderMemberships(), noteVersions = allNoteVersions()
+        readerFolders = allReaderFolders(), readerMemberships = allReaderMemberships(), noteVersions = allNoteVersions(),
+        researchFields = allResearchFields().map { it.field() }
     )
+    /** Replace a validated model in one Room transaction; FK insertion order is explicit. */
+    @Transaction open suspend fun replaceSnapshot(data: LibrarySnapshot) {
+        org.readerka.export.BackupArchive.validate(data)
+        clearResearchFields(); clearEntries(); clearBookmarks(); clearReaderFolders()
+        clearDocuments(); clearCollections(); clearFolders(); clearTags()
+        FolderTree.ordered(data.documentFolders, { it.id }, { it.parentId }).forEach { putFolder(it) }
+        FolderTree.ordered(data.collections, { it.id }, { it.parentId }).forEach { putCollection(it) }
+        data.documents.forEach { putDocument(it) }
+        data.entries.forEach { putEntry(it) }
+        data.tags.forEach { putTag(it) }
+        data.memberships.forEach { putMembership(it) }
+        data.entryTags.forEach { putEntryTag(it) }; data.documentTags.forEach { putDocumentTag(it) }
+        FolderTree.ordered(data.readerFolders, { it.id }, { it.parentId }).forEach { putReaderFolder(it) }
+        data.readerMemberships.forEach { putReaderMembership(it) }
+        FolderTree.ordered(data.bookmarks, { it.id }, { it.parentId }).forEach { putBookmark(it) }
+        data.noteVersions.forEach { putNoteVersion(it) }
+        data.researchFields.forEach { putResearchField(ResearchFieldRow.from(it)) }
+    }
 }
 
-@Database(entities = [Document::class, DocumentFolder::class, Entry::class, Collection::class, Membership::class, Tag::class, EntryTag::class, DocumentTag::class, Bookmark::class, ReaderFolder::class, ReaderMembership::class, NoteVersion::class], version = 4, exportSchema = true)
+@Database(entities = [Document::class, DocumentFolder::class, Entry::class, Collection::class, Membership::class, Tag::class, EntryTag::class, DocumentTag::class, Bookmark::class, ReaderFolder::class, ReaderMembership::class, NoteVersion::class, ResearchFieldRow::class, ImportReceipt::class], version = 5, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun dao(): LibraryDao
     companion object {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS research_fields (id TEXT NOT NULL PRIMARY KEY, json TEXT NOT NULL)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS import_receipts (id TEXT NOT NULL PRIMARY KEY)")
+            }
+        }
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS reader_folders (id TEXT NOT NULL PRIMARY KEY, documentId TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, parentId TEXT, FOREIGN KEY(documentId) REFERENCES documents(id) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(parentId) REFERENCES reader_folders(id) ON UPDATE NO ACTION ON DELETE SET NULL)")
@@ -119,6 +159,6 @@ abstract class LibraryDatabase : RoomDatabase() {
                 }
             }
         }
-        fun open(context: Context, name: String = "readerka.db") = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+        fun open(context: Context, name: String = "readerka.db") = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
     }
 }

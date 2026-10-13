@@ -134,7 +134,7 @@ data class FolderItem(val id: String, val name: String, val parentId: String?)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(entry.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Box {
-                        WorkspaceAction(Outline.More, "Действия записи", { menu = true })
+                        WorkspaceAction(Outline.More, "Действия записи", { menu = true }, Modifier.testTag("entry-menu-${entry.id}"))
                         DropdownMenu(menu, { menu = false }) {
                             DropdownMenuItem(text = { Text("Открыть запись") }, onClick = { menu = false; onEdit() })
                             if (onRight != null) DropdownMenuItem(text = { Text("Открыть справа") }, onClick = { menu = false; onRight() })

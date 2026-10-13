@@ -1,0 +1,2 @@
+57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e  app/src/main/assets/fonts/DejaVuSans.ttf
+c5c282253aab639f6d531c94e5f4cc60f7179c681207780b5a41457c434ca189  app/src/main/assets/fonts/Readerka-CJK-Regular.ttf

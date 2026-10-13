@@ -17,3 +17,28 @@ License: see licenses/Bouncy-Castle.txt.
 
 CommonMark Java 0.24.0 — BSD 2-Clause; see licenses/CommonMark-BSD.txt.
 Workspace outline icons are original Readerka artwork.
+
+Android importer additions:
+DejaVu Sans — Bitstream Vera / DejaVu font license; see licenses/DejaVu.txt.
+Jsoup 1.18.3 — MIT; https://jsoup.org, see licenses/Jsoup-MIT.txt.
+DjVuLibre 3.5.29 — GPL-2.0-or-later; see licenses/DjVuLibre-GPL.txt.
+IJG JPEG 6b — IJG license; see licenses/IJG-JPEG.txt.
+LibTIFF 4.0.10 — libtiff license; see licenses/LibTIFF.txt.
+Zlib 1.2.11 — zlib license; see licenses/Zlib.txt.
+The native libraries are built for arm64-v8a and x86_64 with Android NDK 26.3.11579264.
+Complete native sources and SHA-256 are in windows/third-party; Android build/JNI
+source is in scripts/build-android-djvu.sh and app/src/main/cpp.
+This test APK includes a GPL native component. Distribution must preserve source,
+notices and compatible GPL terms; it is not a signed public release.
+
+Glide GIF decoder 4.16.0 — BSD 2-clause, Google Inc.
+https://github.com/bumptech/glide/tree/v4.16.0/third_party/gif_decoder
+Full upstream notices: licenses/Glide-GIF.txt. Used for every GIF frame, with bounded raster sampling.
+
+Noto Sans CJK SC — SIL Open Font License 1.1.
+© 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
+https://github.com/notofonts/noto-cjk/tree/main/Sans/Variable/TTF
+Static weight 400 instance generated with FontTools 4.61.1.
+Font: fonts/Readerka-CJK-Regular.ttf; license: licenses/NotoCJK-OFL.txt.
+Source SHA-256: 990c807e79c25662a5a9ecf7f971baeb2bf2eab9a559e5ecf15cdfdb8561d21f.
+Generation script and output fingerprints: scripts/prepare-cjk-font.py, docs/android-port/FONT-CHECKSUMS.txt.

@@ -25,6 +25,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class LibraryUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     @Test fun createEditAndOrganizeNoteThroughRealUi() {
         val app = ApplicationProvider.getApplicationContext<ReaderkaApp>()
         val dao = app.database.dao()
@@ -34,8 +35,9 @@ class LibraryUiTest {
         val tagNames = listOf("ТестКант_$suffix", "ТестОнтология_$suffix")
         try {
             compose.onNodeWithContentDescription("Заметки и цитаты").performClick()
+            compose.waitUntil(30_000) { compose.onAllNodesWithTag("catalogue-flat").fetchSemanticsNodes().isNotEmpty() }
             for (name in names) {
-                compose.onNodeWithText("Создать папку").performClick()
+                compose.onNodeWithText("Создать папку").performScrollTo().performClick()
                 compose.onNodeWithText("Название").performTextInput(name)
                 compose.onNodeWithText("Сохранить").performClick()
                 compose.waitUntil(30_000) { runBlocking { dao.allCollections().any { it.name == name } } }
@@ -44,18 +46,21 @@ class LibraryUiTest {
             compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("entry-title").performTextInput(title)
             compose.onNodeWithTag("entry-comment").performTextInput("Независимая мысль о существовании")
+            compose.onNodeWithTag("note-properties").performClick()
             compose.onNodeWithTag("entry-tags").performScrollTo().performTextInput(tagNames.joinToString(", "))
-            compose.onNodeWithText("Папки заметок", substring = true).performScrollTo().performClick()
+            compose.onNodeWithTag("entry-collections").performScrollTo().performClick()
             for (name in names) compose.onNode(hasText(name) and hasAnyAncestor(isDialog())).performScrollTo().performClick()
             compose.onNodeWithText("Применить").performClick()
             compose.onNodeWithText("Сохранить").performClick()
             compose.waitUntil(30_000) { runBlocking { dao.allEntries().any { it.title == title } } }
             val entry = runBlocking { dao.allEntries().single { it.title == title } }
-            assertEquals("Независимая мысль о существовании", entry.comment)
+            assertEquals("Независимая мысль о существовании", entry.richText().text)
             assertNull(entry.documentId); assertNull(entry.anchor)
             compose.waitUntil(30_000) { runBlocking { dao.allMemberships().count { it.entryId == entry.id } == 2 } }
             assertEquals(2, runBlocking { dao.allEntryTags().count { it.entryId == entry.id } })
             compose.waitUntil(30_000) { compose.onAllNodesWithTag("entry-editor").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithContentDescription("Заметки и цитаты").performClick()
+            compose.onNodeWithTag("catalogue-flat").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithContentDescription("Выбрать: $title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithContentDescription("Выбрать: $title").performScrollTo().performClick()
             compose.onNodeWithText("Цвет: Все").performScrollTo().performClick()
@@ -92,7 +97,8 @@ class LibraryUiTest {
             runBlocking { dao.putDocument(d); dao.putEntry(entry!!) }
             compose.onNodeWithContentDescription("Заметки и цитаты").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithText("Цитата $id").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText("Открыть в PDF").performClick()
+            compose.onNodeWithTag("entry-menu-$id").performClick()
+            compose.onNodeWithText("Открыть источник").performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithText("Страница 3 из 3").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Страница 3 из 3").assertIsDisplayed()
             compose.waitUntil(30_000) { runBlocking { dao.allDocuments().first { it.id == id }.lastPage == 2 } }
@@ -101,7 +107,12 @@ class LibraryUiTest {
                 if (view is ViewGroup) for (n in 0 until view.childCount) findPage(view.getChildAt(n))?.let { return it }
                 return null
             }
-            compose.waitUntil(30_000) { compose.runOnUiThread { findPage(compose.activity.window.decorView) != null } }
+            compose.waitUntil(30_000) { compose.runOnUiThread {
+                findPage(compose.activity.window.decorView)?.let { view ->
+                    val bounds = android.graphics.Rect()
+                    view.width > 0 && view.height > 0 && view.bitmap != null && view.isShown && view.getGlobalVisibleRect(bounds) && bounds.height() > 100
+                } == true
+            } }
             fun touch(action: Int, last: Boolean) = compose.runOnUiThread {
                 val view = findPage(compose.activity.window.decorView)!!
                 val glyphs = view.pageText!!.glyphs
@@ -109,10 +120,24 @@ class LibraryUiTest {
                 val now = SystemClock.uptimeMillis()
                 MotionEvent.obtain(now, now, action, rect.centerX(), rect.centerY(), 0).let { event -> view.onTouchEvent(event); event.recycle() }
             }
-            touch(MotionEvent.ACTION_DOWN, false); SystemClock.sleep(650)
+            touch(MotionEvent.ACTION_DOWN, false); SystemClock.sleep(650); compose.waitForIdle()
             touch(MotionEvent.ACTION_MOVE, true); touch(MotionEvent.ACTION_UP, true)
-            compose.onNodeWithContentDescription("Жёлтый").performClick()
-            compose.waitUntil(30_000) { runBlocking { dao.allEntries().count { it.documentId == id } == 2 } }
+            val selected = hasAnyAncestor(hasTestTag("selection-actions"))
+            compose.waitUntil(30_000) { compose.onAllNodes(hasText("Existence is not a predicate.", substring = true) and selected).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNode(hasContentDescription("Жёлтый") and selected).performClick()
+            try {
+                compose.waitUntil(30_000) { runBlocking { dao.allEntries().count { it.documentId == id } == 2 } }
+            } catch (error: ComposeTimeoutException) {
+                val rows = runBlocking { dao.allEntries() }.map { "${it.id}: ${it.documentId}, ${it.kind}, ${it.quote}" }
+                val model = compose.runOnUiThread { androidx.lifecycle.ViewModelProvider(compose.activity)[org.readerka.ui.LibraryViewModel::class.java] }
+                val details = "Expected two quotations for $id; rows=$rows; readers=${model.readers.value.mapValues { it.value.document.id }}; selections=${model.pdfSelections.value}"
+                val directory = File(app.filesDir, "test-results").apply { mkdirs() }
+                File(directory, "source-save-state.txt").writeText(details)
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
+                    File(directory, "source-save.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle()
+                }
+                throw AssertionError(details, error)
+            }
             val saved = runBlocking { dao.allEntries().first { it.documentId == id && it.id != id } }
             assertTrue(saved.quote.contains("Existence is not a predicate."))
             assertEquals(2, saved.anchor!!.page); assertEquals(Marker.Yellow, saved.color)

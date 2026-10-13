@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -119,7 +120,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                 TextButton(onClick = { mode = "notes"; vm.navigate("notes") }, modifier = Modifier.weight(1f)) { Text("Заметки", color = if (mode == "notes") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Text(if (mode == "pdf") "Папки библиотеки PDF" else if (mode == "consp") "Отдельные папки конспектов" else "Папки заметок и цитат", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp))
-            OutlinedTextField(search, { search = it }, singleLine = true, placeholder = { Text("Поиск в проводнике") }, modifier = Modifier.fillMaxWidth().padding(8.dp), leadingIcon = { Icon(Outline.Search, null, Modifier.size(18.dp)) })
+            OutlinedTextField(search, { search = it }, singleLine = true, placeholder = { Text("Поиск в проводнике") }, modifier = Modifier.fillMaxWidth().padding(8.dp).testTag("explorer-search"), leadingIcon = { Icon(Outline.Search, null, Modifier.size(18.dp)) })
             TextButton(onClick = { selectFolder(null); vm.navigate(if (mode == "pdf") "library" else mode); onOpened() }, modifier = Modifier.fillMaxWidth().onGloballyPositioned { targets[null] = it.boundsInRoot() }) { Text(if (mode == "pdf") "Библиотека PDF" else if (mode == "consp") "Папки конспектов" else "Папки заметок и цитат") }
             HorizontalDivider()
             LazyColumn(Modifier.weight(1f)) {
@@ -191,14 +192,16 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("document-tabs-$pane")) {
-                model.tabs.forEach { tab ->
+                model.tabs.forEachIndexed { index, tab -> key(tab.id) {
                     val selected = model.selectedId == tab.id
-                    val title = if (tab.kind == WorkspaceKind.Pdf) data.documents.firstOrNull { it.id == tab.documentId }?.title else drafts.firstOrNull { it.entry.id == tab.documentId }?.entry?.title ?: data.entries.firstOrNull { it.id == tab.documentId }?.title
+                    val bringIntoView = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+                    LaunchedEffect(selected, index) { if (selected) { withFrameNanos { }; bringIntoView.bringIntoView() } }
+                    val title = if (tab.kind == WorkspaceKind.LibraryGraph) "Граф библиотеки" else if (tab.kind == WorkspaceKind.ResearchField) data.researchFields.firstOrNull { it.id == tab.documentId }?.title else if (tab.kind == WorkspaceKind.Pdf) data.documents.firstOrNull { it.id == tab.documentId }?.title else drafts.firstOrNull { it.entry.id == tab.documentId }?.entry?.title ?: data.entries.firstOrNull { it.id == tab.documentId }?.title
                     var menu by remember { mutableStateOf(false) }
                     var dragStart by remember { mutableStateOf<Float?>(null) }
                     var dragDelta by remember { mutableFloatStateOf(0f) }
                     Row(Modifier.mouseDrag({ dragStart = null; dragDelta = 0f }, { if (dragStart == null) dragStart = it.x; dragDelta = it.x - (dragStart ?: it.x) }, { if (kotlin.math.abs(dragDelta) > 60) vm.moveTab(pane, tab.id, if (dragDelta > 0) 1 else -1) }).width(248.dp).heightIn(min = 48.dp).background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
-                        .combinedClickable(onClick = { vm.selectTab(pane, tab.id) }, onLongClick = { menu = true }).testTag("workspace-tab-${tab.id}"), verticalAlignment = Alignment.CenterVertically) {
+                        .combinedClickable(onClick = { vm.selectTab(pane, tab.id) }, onLongClick = { menu = true }).then(Modifier.bringIntoViewRequester(bringIntoView)).testTag("workspace-tab-${tab.id}"), verticalAlignment = Alignment.CenterVertically) {
                         Icon(if (tab.pinned) Outline.Pin else if (tab.kind == WorkspaceKind.Pdf) Outline.File else Outline.Note, null, Modifier.padding(start = 10.dp).size(18.dp), tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(title?.ifBlank { "Без названия" } ?: "Документ недоступен", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
                         Box {
@@ -206,6 +209,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                             DropdownMenu(menu, { menu = false }) {
                                 DropdownMenuItem(text = { Text(if (tab.pinned) "Открепить" else "Закрепить") }, onClick = { menu = false; vm.pinTab(pane, tab.id) })
                                 DropdownMenuItem(text = { Text("Открыть справа") }, onClick = { menu = false; vm.openRight(tab, pane) })
+                                DropdownMenuItem(text = { Text("Перенести в другую область") }, onClick = { menu = false; vm.moveTabToOtherPane(pane, tab.id) })
                                 DropdownMenuItem(text = { Text("Изменить порядок: левее") }, enabled = model.tabs.indexOf(tab) > 0, onClick = { menu = false; vm.moveTab(pane, tab.id, -1) })
                                 DropdownMenuItem(text = { Text("Изменить порядок: правее") }, enabled = model.tabs.indexOf(tab) < model.tabs.lastIndex, onClick = { menu = false; vm.moveTab(pane, tab.id, 1) })
                                 DropdownMenuItem(text = { Text("Закрыть вкладку") }, onClick = { menu = false; vm.closeTab(pane, tab.id) })
@@ -214,7 +218,7 @@ private fun Modifier.mouseDrag(onStart: () -> Unit, onMove: (Offset) -> Unit, on
                         if (!tab.pinned) WorkspaceAction(Outline.Close, "Закрыть вкладку, сохранив работу", { vm.closeTab(pane, tab.id) }, Modifier.testTag("close-tab-${tab.id}"))
                     }
                     VerticalDivider(Modifier.height(48.dp))
-                }
+                } }
             }
             Box(Modifier.fillMaxWidth().height(2.dp).background(if (activePane) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant))
         }

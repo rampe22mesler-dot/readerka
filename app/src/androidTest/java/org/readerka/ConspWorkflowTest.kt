@@ -24,6 +24,7 @@ import java.util.UUID
 @OptIn(ExperimentalTestApi::class)
 class ConspWorkflowTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     private val app get() = ApplicationProvider.getApplicationContext<ReaderkaApp>()
     private val vm get() = compose.runOnUiThread { ViewModelProvider(compose.activity)[LibraryViewModel::class.java] }
     private enum class Input { Touch, Keyboard, Mouse }
@@ -225,7 +226,8 @@ class ConspWorkflowTest {
         compose.onNodeWithTag("workspace-pane-1").assertDoesNotExist()
         compose.onNodeWithTag("restore-split-0").performTouchInput { click() }
         waitFor("resize-split")
-        compose.onNodeWithTag("resize-split").performTouchInput { down(center); moveBy(androidx.compose.ui.geometry.Offset(-600f, 0f), 400); up() }
+        val windowWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+        compose.onNodeWithTag("resize-split").performTouchInput { down(center); moveBy(androidx.compose.ui.geometry.Offset(-windowWidth * .48f, 0f), 400); up() }
         compose.waitUntil(60_000) { !vm.workspace.value.split && vm.workspace.value.visiblePane == 1 }
         compose.onNodeWithTag("pane-fullscreen-1").performTouchInput { click() }
     }

@@ -54,6 +54,8 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         val density = LocalDensity.current
         val scope = rememberCoroutineScope()
         var selection by remember { mutableStateOf<Selection?>(null) }
+        val preservedSelections by vm.pdfSelections.collectAsState()
+        val preservedViews by vm.pdfViews.collectAsState()
         val workspace by vm.workspace.collectAsState()
         var positioned by remember(session.token) { mutableStateOf(false) }
         var showPanel by rememberSaveable { mutableStateOf(false) }
@@ -78,6 +80,10 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 ReaderTool.Quotes -> { showPanel = true; bookmarksTab = false; conspTab = false }
                 ReaderTool.Bookmarks -> { showPanel = true; bookmarksTab = true; conspTab = false }
                 ReaderTool.Consp -> { showPanel = true; conspTab = true }
+                ReaderTool.NewBookmark -> bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = session.offset)
+                ReaderTool.Quote -> selection?.let { value -> vm.editBeside(Entry(UUID.randomUUID().toString(), quoteTitle(value.text), quote = value.text, documentId = session.document.id, anchor = value.anchor, kind = EntryKind.Quote, type = NoteType.Quote), session.pane) }
+                ReaderTool.AppendConsp -> selection?.let { addConsp = it }
+                ReaderTool.ToField -> selection?.let { vm.quoteToField(it.text, it.anchor, session.document) }
                 ReaderTool.Page -> { pageInput = (currentPage + 1).toString(); jump = true }
                 null -> return@LaunchedEffect
             }
@@ -102,7 +108,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
             // after asynchronous PDF dimensions and a frame-clock suspension.
             withContext(Dispatchers.Main) { list.scrollToItem(session.page, offset); positioned = true }
         }
-        LaunchedEffect(list, session.engine, fitPage, viewport) {
+        LaunchedEffect(list, session.engine, session.token, fitPage, viewport) {
             if (viewport.width <= 0 || viewport.height <= 0) return@LaunchedEffect
             snapshotFlow { if (positioned) list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset else null }.filterNotNull()
                 .map { (page, offset) -> page to (offset / pageHeight(page) * 10_000).toInt().coerceIn(0, 10_000) }
@@ -110,7 +116,8 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 .debounce(350).collect { (page, offset) -> vm.position(session.document, page, offset) }
         }
         fun go(page: Int) {
-            selection?.view?.clearSelection(); selection = null
+            positioned = false
+            selection?.view?.clearSelection(); selection = null; vm.rememberPdfSelection(session.tabId, null)
             // A focused native canvas otherwise asks the lazy list to reveal its old item
             // while the explicit page jump is being measured.
             (activity?.currentFocus as? PdfPageView)?.clearFocus()
@@ -132,6 +139,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
         val selectionActions: @Composable () -> Unit = { selection?.let { s ->
                 Surface(tonalElevation = 3.dp, shadowElevation = 6.dp, shape = MaterialTheme.shapes.medium) { Column(Modifier.widthIn(max = 680.dp).padding(8.dp)) {
                     Text(s.text, maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                    Text("Перевод передаст выделенный текст Google и использует интернет.", style = MaterialTheme.typography.labelSmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text))
@@ -141,16 +149,21 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                             vm.editBeside(Entry(UUID.randomUUID().toString(), s.text.lineSequence().first().take(80), s.text,
                                 documentId = session.document.id, anchor = s.anchor, type = NoteType.Quote, color = vm.preferences.value.defaultColor), session.pane)
                         }) { Text(stringResource(R.string.comment)) }
+                        TextButton(onClick = { vm.quoteToField(s.text, s.anchor, session.document) }) { Text("На исследовательское поле") }
                         TextButton(onClick = { vm.focusPane(session.pane); addConsp = s }) { Text("Добавить в конспект…") }
                         TextButton(onClick = { (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(context.getString(R.string.source_quote), s.text)) }) { Text(stringResource(R.string.copy)) }
-                        IconButton(onClick = { s.view.clearSelection(); selection = null }) { Icon(Outline.Close, stringResource(R.string.clear_selection)) }
-                        ColorPalette(null) { color -> vm.highlight(s.text, s.anchor, color, session.document); s.view.clearSelection(); selection = null }
+                        IconButton(onClick = { s.view.clearSelection(); selection = null; vm.rememberPdfSelection(session.tabId, null) }) { Icon(Outline.Close, stringResource(R.string.clear_selection)) }
+                    }
+                    Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        ColorPalette(null) { color -> vm.highlight(s.text, s.anchor, color, session.document); s.view.clearSelection(); selection = null; vm.rememberPdfSelection(session.tabId, null) }
                     }
                 }
             } } }
         Column(Modifier.fillMaxSize()) {
             var help by remember { mutableStateOf(false) }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { quickPages = !quickPages }, modifier = Modifier.heightIn(min = 48.dp).testTag("reader-page-counter")) { Text(stringResource(R.string.page, currentPage + 1, session.engine.pageCount)) }
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 WorkspaceAction(Outline.Note, "Цитаты в PDF", { showPanel = !showPanel || bookmarksTab || conspTab; bookmarksTab = false; conspTab = false }, Modifier.testTag("reader-quotes-button"), selected = showPanel && !bookmarksTab && !conspTab)
                 WorkspaceAction(Outline.Bookmark, "Закладки", { showPanel = !showPanel || !bookmarksTab || conspTab; bookmarksTab = true; conspTab = false }, Modifier.testTag("reader-bookmarks-button"), selected = showPanel && bookmarksTab && !conspTab)
                 WorkspaceAction(Outline.Plus, "Добавить закладку", { bookmark = Bookmark(UUID.randomUUID().toString(), session.document.id, currentPage, context.getString(R.string.source_page, currentPage + 1), offset = session.offset) })
@@ -158,7 +171,6 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                 WorkspaceAction(Outline.Plus, "Создать конспект", { vm.focusPane(session.pane); createConsp = true }, Modifier.testTag("reader-create-consp"))
                 WorkspaceAction(Outline.Search, "Поиск в PDF", { search = true })
                 WorkspaceAction(Outline.Settings, "Свойства PDF", { properties = true })
-                TextButton(onClick = { quickPages = !quickPages }, modifier = Modifier.heightIn(min = 48.dp).testTag("reader-page-counter")) { Text(stringResource(R.string.page, currentPage + 1, session.engine.pageCount)) }
                 TextButton(onClick = { fitPage = !fitPage; go(currentPage) }) { Text(stringResource(if (fitPage) R.string.fit_width else R.string.fit_page)) }
                 WorkspaceAction(Outline.Split, "Открыть справа", { vm.openRight(WorkspaceTab(session.tabId, session.document.id, WorkspaceKind.Pdf, page = currentPage, offset = session.offset), session.pane) })
                 WorkspaceAction(Outline.Fullscreen, if (fullscreen) "Выйти из полного экрана" else "Полный экран", { onFullscreen(!fullscreen) })
@@ -169,6 +181,7 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                         DropdownMenuItem(text = { Text("Справка по чтению") }, onClick = { menu = false; help = true })
 
                     }
+                }
                 }
             }
             HorizontalDivider()
@@ -185,8 +198,9 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                     BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().onSizeChanged { viewport = it }) {
                         LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("pdf-pages"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(session.engine.pageCount, key = { it }) { index ->
-                                PdfPage(session, index, maxWidth, maxHeight, fitPage, docEntries.filter { it.anchor?.page == index },
-                                    { text, anchor, view -> selection?.view?.takeIf { it !== view }?.clearSelection(); selection = Selection(text, anchor, view) },
+                                PdfPage(session, index, maxWidth, maxHeight, fitPage, docEntries.filter { it.anchor?.page == index }, preservedSelections[session.tabId]?.takeIf { it.second.page == index },
+                                    preservedViews["${session.tabId}:$index"] ?: PdfViewState(), { vm.rememberPdfView(session.tabId, index, it) },
+                                    { text, anchor, view -> selection?.view?.takeIf { it !== view }?.clearSelection(); selection = Selection(text, anchor, view); vm.rememberPdfSelection(session.tabId, text to anchor) },
                                     { vm.editBeside(it, session.pane) }, { quickPages = !quickPages }, { keyHandler(it) }, { vm.focusPane(session.pane) })
                             }
                         }
@@ -237,7 +251,8 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
 }
 
 @Composable private fun PdfPage(session: ReaderSession, index: Int, availableWidth: androidx.compose.ui.unit.Dp, availableHeight: androidx.compose.ui.unit.Dp, fitPage: Boolean,
-    highlights: List<Entry>, onSelection: (String, Anchor, PdfPageView) -> Unit, onHighlight: (Entry) -> Unit, onCenterTap: () -> Unit, onKey: (KeyEvent) -> Boolean, onFocus: () -> Unit) {
+    highlights: List<Entry>, preserved: Pair<String, Anchor>?, viewport: PdfViewState, onViewport: (PdfViewState) -> Unit,
+    onSelection: (String, Anchor, PdfPageView) -> Unit, onHighlight: (Entry) -> Unit, onCenterTap: () -> Unit, onKey: (KeyEvent) -> Boolean, onFocus: () -> Unit) {
     val density = LocalDensity.current
     val dimensions by produceState<Pair<Int, Int>?>(null, session.engine, index) {
         value = withContext(Dispatchers.IO) { runCatching { session.engine.dimensions(index) }.getOrNull() }
@@ -279,6 +294,9 @@ private data class PdfMatch(val text: String, val anchor: Anchor)
                     view.onHighlight = onHighlight; view.onCenterTap = onCenterTap
                     view.onNavigationKey = onKey
                     view.onPaneFocus = onFocus
+                    view.onViewport = onViewport; view.restoreViewport(viewport)
+                    view.restoreSelection(preserved)
+                    if (preserved != null && text != null) onSelection(preserved.first, preserved.second, view)
                 }, modifier = Modifier.fillMaxSize().clipToBounds())
             }
             if (bitmap != null && text?.glyphs?.isEmpty() == true) Text(stringResource(R.string.no_text_layer),

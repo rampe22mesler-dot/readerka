@@ -22,6 +22,7 @@ import java.util.UUID
 @OptIn(ExperimentalTestApi::class)
 class CatalogueFoldersTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     private val app get() = ApplicationProvider.getApplicationContext<ReaderkaApp>()
     private val vm get() = compose.runOnUiThread { ViewModelProvider(compose.activity)[LibraryViewModel::class.java] }
     private enum class Input { Touch, Keyboard, Mouse }
@@ -31,7 +32,12 @@ class CatalogueFoldersTest {
             Input.Mouse -> node.performMouseInput { click() }
             Input.Keyboard -> {
                 InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
+                compose.runOnUiThread {
+                    for (action in listOf(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP))
+                        compose.activity.window.callback.dispatchKeyEvent(android.view.KeyEvent(0, 0, action, android.view.KeyEvent.KEYCODE_TAB, 0))
+                }
                 compose.waitUntil(30_000) { var focused = false; node.performSemanticsAction(SemanticsActions.RequestFocus) { focused = it() }; focused }
+                node.assertIsFocused()
                 node.performKeyInput { pressKey(Key.Enter) }
             }
         }

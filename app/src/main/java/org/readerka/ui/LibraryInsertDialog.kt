@@ -84,7 +84,7 @@ enum class InsertMode(val label: String) { Inline("Ссылка на текст"
     }, confirmButton = { TextButton(enabled = canInsert, onClick = {
         val targets = if (pdfDocument != null) listOf(Triple(pdfDocument.title, ResearchLinks.document(pdfDocument.id, page.toInt()), null)) else chosen.map { e ->
             val targetBlock = block.takeIf { preview?.id == e.id }
-            val target = if ((targetBlock == "source-page" || mode == InsertMode.Content) && e.anchor != null && e.documentId != null) ResearchLinks.document(e.documentId, e.anchor.page + 1) + "&entry=" + e.id else ResearchLinks.entry(e.id, targetBlock)
+            val target = if ((targetBlock == "source-page" || mode == InsertMode.Content) && e.anchor != null && e.documentId != null) ResearchLinks.document(requireNotNull(e.documentId), requireNotNull(e.anchor).page + 1) + "&entry=" + e.id else ResearchLinks.entry(e.id, targetBlock)
             Triple(e.title, target, e)
         }
         var result = RichText()

@@ -6,6 +6,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,9 +50,20 @@ import org.readerka.data.FolderTree
 
 /** Directory is an ordinary focusable/touchable catalogue item with explicit actions. */
 @Composable fun CatalogueFolder(folder: FolderItem, detail: String, onOpen: () -> Unit, onCreate: () -> Unit, onEdit: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).combinedClickable(onClick = onOpen, onLongClick = { menu = true }, role = androidx.compose.ui.semantics.Role.Button)
+        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                when (event.key) {
+                    Key.Enter, Key.NumPadEnter, Key.Spacebar -> if (focused) { if (event.type == KeyEventType.KeyDown) onOpen(); true } else false
+                    Key.F10 -> if (event.isShiftPressed) { if (event.type == KeyEventType.KeyDown) menu = true; true } else false
+                    else -> false
+                }
+            }
+            .then(if (focused) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium) else Modifier)
+            .combinedClickable(onClick = onOpen, onLongClick = { menu = true }, role = androidx.compose.ui.semantics.Role.Button)
             .testTag("catalogue-folder-${folder.id}").padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Outline.Folder, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 8.dp)) {

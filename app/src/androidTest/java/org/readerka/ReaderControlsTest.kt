@@ -32,6 +32,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class ReaderControlsTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     private val app get() = ApplicationProvider.getApplicationContext<ReaderkaApp>()
     private val dao get() = app.database.dao()
     private fun findPage(view: View, page: Int): PdfPageView? {
@@ -78,7 +79,7 @@ class ReaderControlsTest {
             val anchor = PdfEngine(file, app.cacheDir).use { it.text(0).matches("quotation").single() }
             val entry = Entry("quote-$id", "Saved quotation", "quotation", documentId = id, anchor = anchor, type = NoteType.Quote)
             runBlocking { dao.putDocument(document); dao.putEntry(entry) }
-            compose.runOnUiThread { vm.open(document, page = 0) }; waitPage(0)
+            compose.runOnUiThread { vm.layout(split = false, sidebarVisible = false); vm.focusPane(0); vm.open(document, page = 0, pane = 0) }; waitPage(0)
             block(document, vm, entry)
         } finally {
             compose.runOnUiThread { vm.navigate("library") }

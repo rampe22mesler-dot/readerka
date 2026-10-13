@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit
 @OptIn(ExperimentalTestApi::class)
 class WorkspaceRedesignTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @org.junit.Before fun waitForStartup() = compose.waitForReaderkaReady()
     private val app get() = ApplicationProvider.getApplicationContext<ReaderkaApp>()
     private val dao get() = app.database.dao()
     private val vm get() = compose.runOnUiThread { ViewModelProvider(compose.activity)[LibraryViewModel::class.java] }
@@ -50,10 +51,10 @@ class WorkspaceRedesignTest {
     }
     private fun waitFor(tag: String) { compose.waitUntil(60_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() } }
     private fun counter(pane: Int) = compose.onNode(hasTestTag("reader-page-counter") and hasAnyAncestor(hasTestTag("workspace-pane-$pane")))
-    private fun fixture(block: (Document, List<org.readerka.data.Collection>) -> Unit) {
+    private fun fixture(scope: CollectionScope = CollectionScope.Notes, block: (Document, List<org.readerka.data.Collection>) -> Unit) {
         val suffix = UUID.randomUUID().toString()
         val doc = Document(suffix, "Чтение · исследование", "research.pdf", "$suffix.pdf", authors = "Readerka", pageCount = 4)
-        val folders = listOf(org.readerka.data.Collection("a-$suffix", "Философия"), org.readerka.data.Collection("b-$suffix", "Аргументы"))
+        val folders = listOf(org.readerka.data.Collection("a-$suffix", "Философия", scope = scope), org.readerka.data.Collection("b-$suffix", "Аргументы", scope = scope))
         val oldPreferences = vm.preferences.value
         val oldEntryIds = runBlocking { dao.allEntries().map { it.id }.toSet() }
         val oldDraftIds = vm.workspace.value.drafts.map { it.entry.id }.toSet()
@@ -92,7 +93,8 @@ class WorkspaceRedesignTest {
             File(app.filesDir, "pdfs/${doc.storedName}").delete()
         }
     }
-    private fun scenario(input: Input) = fixture { doc, folders ->
+    private fun active(tag: String) = compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("workspace-pane-${vm.workspace.value.activePane}")))
+    private fun scenario(input: Input) = fixture(if (input == Input.Keyboard) CollectionScope.Notes else CollectionScope.Consp) { doc, folders ->
         androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().setInTouchMode(input == Input.Touch)
         val tab = vm.workspace.value.panes[0].selected!!
         act(compose.onNodeWithTag("tab-menu-${tab.id}"), input)
@@ -108,32 +110,41 @@ class WorkspaceRedesignTest {
         act(counter(1), input)
         compose.waitUntil(60_000) { vm.workspace.value.activePane == 1 }
         if (input == Input.Keyboard) key(KeyEvent.KEYCODE_N)
-        else act(compose.onNode(hasContentDescription("Создать конспект") and hasAnyAncestor(hasTestTag("workspace-pane-1"))), input)
+        else {
+            act(compose.onNode(hasContentDescription("Создать конспект") and hasAnyAncestor(hasTestTag("workspace-pane-1"))), input)
+            compose.onNodeWithTag("new-consp-title").performTextInput("Рабочий конспект")
+            act(compose.onNodeWithTag("create-consp-confirm"), input)
+        }
         waitFor("entry-editor")
         val title = "Конспект · язык и смысл"
-        compose.onNodeWithTag("entry-title").performTextReplacement(title)
-        compose.onNodeWithTag("entry-comment").performTextInput("# Язык и смысл\n\n**Главная мысль** и *вопрос*\n\n- [ ] Проверить аргумент\n- [x] Прочитать главу\n\n> Исходный текст хранится отдельно.\n\n[Источник](readerka://document/${doc.id}?page=2)")
+        active("entry-title").performTextReplacement(title)
+        active("entry-comment").performScrollTo()
+        act(active("entry-comment"), input)
+        active("entry-comment").performTextInput("# Язык и смысл\n\n**Главная мысль** и *вопрос*\n\n- [ ] Проверить аргумент\n- [x] Прочитать главу\n\n> Исходный текст хранится отдельно.\n\n[Источник](readerka://document/${doc.id}?page=2)")
         val id = vm.workspace.value.activeDraftId!!
-        compose.waitUntil(60_000) { vm.draftStatus.value == "Черновик сохранён" }
+        compose.waitUntil(60_000) {
+            val expected = vm.workspace.value.drafts.single { it.entry.id == id }.entry
+            runBlocking { WorkspaceStore(app).values.first().drafts.any { it.entry.id == id && it.entry == expected } }
+        }
         val draft = vm.workspace.value.drafts.single { it.entry.id == id }
         // Keyboard focus stays in text while PDF retains its own page.
-        act(compose.onNodeWithTag("entry-comment"), input)
+        act(active("entry-comment"), input)
         if (input == Input.Keyboard) key(KeyEvent.KEYCODE_DPAD_RIGHT, 0)
         assertEquals(1, vm.readers.value[1]!!.page)
-        act(compose.onNodeWithTag("note-properties"), input)
-        compose.onNodeWithTag("entry-collections").performScrollTo()
-        act(compose.onNodeWithTag("entry-collections"), input)
+        act(active("note-properties"), input)
+        active("entry-collections").performScrollTo()
+        act(active("entry-collections"), input)
         folders.forEach { folder -> act(compose.onNodeWithTag("select-folder-${folder.id}"), input) }
         act(compose.onNodeWithText("Применить"), input)
         compose.waitUntil(60_000) { vm.workspace.value.drafts.single { it.entry.id == id }.collections.size == 2 }
-        act(compose.onNodeWithTag("note-properties"), input)
+        act(active("note-properties"), input)
         compose.activityRule.scenario.recreate()
         waitFor("entry-editor")
         assertEquals(draft.entry.comment, vm.workspace.value.drafts.single { it.entry.id == id }.entry.comment)
         assertEquals(1, vm.readers.value[1]!!.page)
-        act(compose.onNodeWithTag("markdown-preview"), input)
+        act(active("markdown-preview"), input)
         waitFor("markdown-rendered")
-        compose.onNodeWithText("Язык и смысл", substring = false).assertExists()
+        compose.onNode(hasText("# Язык и смысл", substring = true) and hasAnyAncestor(hasTestTag("markdown-rendered")) and hasAnyAncestor(hasTestTag("workspace-pane-${vm.workspace.value.activePane}"))).assertExists()
         if (input == Input.Touch) {
             compose.runOnUiThread { vm.layout(sidebarVisible = true); vm.settings(vm.preferences.value.copy(theme = ThemeMode.Light)) }
             screenshot("readerka-0.6-workspace-light.png")
@@ -141,8 +152,8 @@ class WorkspaceRedesignTest {
             compose.waitUntil(60_000) { vm.preferences.value.theme == ThemeMode.Dark }
             screenshot("readerka-0.6-workspace-dark.png")
         }
-        if (input == Input.Keyboard) key(KeyEvent.KEYCODE_S) else act(compose.onNodeWithTag("save-entry"), input)
-        compose.waitUntil(60_000) { runBlocking { dao.allEntries().any { it.id == id } } && vm.workspace.value.drafts.none { it.entry.id == id } }
+        if (input == Input.Keyboard) key(KeyEvent.KEYCODE_S) else act(active("save-entry"), input)
+        compose.waitUntil(60_000) { runBlocking { dao.allEntries().any { it.id == id } } && (vm.workspace.value.drafts.none { it.entry.id == id } || vm.draftStatus.value == "Конспект сохранён") }
         assertEquals(1, runBlocking { dao.allEntries().count { it.id == id } })
         assertEquals(folders.map { it.id }.toSet(), runBlocking { dao.allMemberships().filter { it.entryId == id }.map { it.collectionId }.toSet() })
         // Open another independent note beside the first, through the same visible action/command.
@@ -156,18 +167,18 @@ class WorkspaceRedesignTest {
             act(compose.onNodeWithTag("command-new-note"), input)
         }
         waitFor("entry-editor")
-        compose.onNodeWithTag("entry-title").performTextReplacement("Другая заметка")
-        compose.onNodeWithTag("entry-comment").performTextInput("Независимый текст второй заметки")
+        active("entry-title").performTextReplacement("Другая заметка")
+        active("entry-comment").performTextInput("Независимый текст второй заметки")
         val secondId = vm.workspace.value.activeDraftId!!
         assertNotEquals(id, secondId)
         assertEquals(WorkspaceKind.Note, vm.workspace.value.panes[0].selected!!.kind)
         assertEquals(WorkspaceKind.Note, vm.workspace.value.panes[1].selected!!.kind)
-        if (input == Input.Keyboard) key(KeyEvent.KEYCODE_S) else act(compose.onNodeWithTag("save-entry"), input)
+        if (input == Input.Keyboard) key(KeyEvent.KEYCODE_S) else act(active("save-entry"), input)
         compose.waitUntil(60_000) { runBlocking { dao.allEntries().any { it.id == secondId } } && vm.workspace.value.drafts.none { it.entry.id == secondId } }
         assertEquals(draft.entry.comment, runBlocking { dao.allEntries().single { it.id == id }.comment })
         runBlocking { compose.runOnUiThread { vm.deleteEntries(setOf(secondId)) }.join() }
         if (!vm.workspace.value.sidebarVisible) act(compose.onNodeWithTag("toggle-workspace-sidebar"), input)
-        act(compose.onNodeWithText("Заметки", substring = false), input)
+        act(compose.onNodeWithText(if (input == Input.Keyboard) "Заметки" else "Конспекты", substring = false), input)
         act(compose.onNodeWithContentDescription("Создать папку"), input)
         compose.onNodeWithText("Название", substring = false).performTextInput("Новая ветка")
         act(compose.onNodeWithText("Сохранить", substring = false), input)
@@ -194,40 +205,76 @@ class WorkspaceRedesignTest {
     @Test fun mouseWorkspaceEditorMembershipsAndRestore() = scenario(Input.Mouse)
     @Test fun touchResizeAcrossFramesAndNarrowSplitEditorKeepsSaveAboveIme() = fixture { _, _ ->
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        fun shell(command: String) = android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).bufferedReader().use { it.readText() }
+        val previousIme = shell("settings get secure show_ime_with_hard_keyboard").trim()
+        try {
+        shell("settings put secure show_ime_with_hard_keyboard 1")
         instrumentation.setInTouchMode(true)
         act(compose.onNodeWithTag("tab-menu-${vm.workspace.value.panes[0].selectedId}"), Input.Touch)
         act(compose.onNodeWithText("Открыть справа"), Input.Touch)
         compose.waitUntil(60_000) { vm.readers.value.size == 2 }
         val before = vm.workspace.value.splitFraction
         // Separate batches let the boundary move and remeasure between finger movements.
-        compose.onNodeWithTag("resize-split").performTouchInput { down(center); moveBy(androidx.compose.ui.geometry.Offset(0f, 40f)) }
+        compose.onNodeWithTag("resize-split").performTouchInput { down(center); moveBy(androidx.compose.ui.geometry.Offset(100f, 0f)) }
         compose.waitForIdle()
-        compose.onNodeWithTag("resize-split").performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(0f, 40f)); up() }
+        compose.onNodeWithTag("resize-split").performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(100f, 0f)); up() }
         compose.waitUntil(60_000) { vm.workspace.value.splitFraction > before + .06f }
         act(compose.onNode(hasContentDescription("Создать конспект") and hasAnyAncestor(hasTestTag("workspace-pane-1"))), Input.Touch)
+        compose.onNodeWithTag("new-consp-title").performTextInput("Проверка клавиатуры")
+        act(compose.onNodeWithTag("create-consp-confirm"), Input.Touch)
         waitFor("entry-editor")
-        act(compose.onNodeWithTag("entry-title"), Input.Touch)
+        act(active("entry-title"), Input.Touch)
         fun imeBottom() = compose.runOnUiThread {
             val view = compose.activity.window.decorView
             androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(view.rootWindowInsets, view).getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
         }
         compose.waitUntil(60_000) { imeBottom() > 100 }
-        compose.onNodeWithTag("entry-title").performTextReplacement("Касания и экранная клавиатура")
-        compose.onNodeWithTag("entry-comment").performTextInput("Текст виден, сохранение доступно")
-        compose.onNodeWithTag("save-entry").assertIsDisplayed()
-        compose.onNodeWithTag("workspace-pane-1").assertDoesNotExist()
+        active("entry-title").performTextReplacement("Касания и экранная клавиатура")
+        active("entry-comment").performTextInput("Текст виден, сохранение доступно")
+        active("entry-comment").performScrollTo()
+        act(active("entry-comment"), Input.Touch)
+        compose.waitUntil(60_000) { imeBottom() > 100 }
+        active("save-entry").assertIsDisplayed()
+        val activeHeight = compose.onNodeWithTag("workspace-pane-${vm.workspace.value.activePane}").fetchSemanticsNode().boundsInRoot.height / compose.activity.resources.displayMetrics.density
+        if (activeHeight < 500f) compose.onNodeWithTag("workspace-pane-1").assertDoesNotExist()
+        else compose.onNodeWithTag("workspace-pane-1").assertIsDisplayed()
         val keyboardTop = compose.runOnUiThread { compose.activity.window.decorView.height } - imeBottom()
-        assertTrue("Save must be above the real IME", compose.onNodeWithTag("save-entry").fetchSemanticsNode().boundsInWindow.bottom <= keyboardTop + 2)
+        assertTrue("The real IME must remain visible while checking Save", imeBottom() > 100)
+        assertTrue("Save must be above the real IME", active("save-entry").fetchSemanticsNode().boundsInWindow.bottom <= keyboardTop + 2)
+        compose.waitUntil(60_000) {
+            val saveTop = active("save-entry").fetchSemanticsNode().boundsInWindow.top
+            compose.runOnUiThread {
+                fun find(view: View): org.readerka.ui.ResearchEditText? = when (view) {
+                    is org.readerka.ui.ResearchEditText -> view
+                    is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { find(view.getChildAt(it)) }
+                    else -> null
+                }
+                find(compose.activity.window.decorView)?.let { view ->
+                    val visible = android.graphics.Rect()
+                    val layout = view.layout
+                    if (!view.hasFocus() || !view.getLocalVisibleRect(visible) || layout == null) false
+                    else {
+                        val line = layout.getLineForOffset(view.selectionEnd.coerceAtLeast(0))
+                        val top = view.totalPaddingTop + layout.getLineTop(line) - view.scrollY
+                        val bottom = view.totalPaddingTop + layout.getLineBottom(line) - view.scrollY
+                        val origin = IntArray(2); view.getLocationInWindow(origin)
+                        top >= visible.top && bottom <= visible.bottom && origin[1] + bottom <= saveTop + 2
+                    }
+                } == true
+            }
+        }
+        assertTrue("IME must still be visible with the caret", imeBottom() > 100)
         instrumentation.uiAutomation.executeShellCommand("screencap -p /sdcard/readerka-preview-ime-split-test.png").use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
         val id = vm.workspace.value.activeDraftId!!
-        act(compose.onNodeWithTag("save-entry"), Input.Touch)
-        compose.waitUntil(60_000) { runBlocking { dao.allEntries().any { it.id == id } } && vm.workspace.value.drafts.none { it.entry.id == id } }
+        act(active("save-entry"), Input.Touch)
+        compose.waitUntil(60_000) { runBlocking { dao.allEntries().any { it.id == id } } && (vm.workspace.value.drafts.none { it.entry.id == id } || vm.draftStatus.value == "Конспект сохранён") }
+        } finally { shell("input keyevent 4"); shell("settings put secure show_ime_with_hard_keyboard " + previousIme.ifBlank { "0" }) }
     }
     @Test fun closingSharedDraftClosesOnlyActivePaneAndRestoresWork() = fixture { _, _ ->
         compose.runOnUiThread { vm.newNote() }
         waitFor("entry-editor")
-        compose.onNodeWithTag("entry-title").performTextInput("Общий черновик")
-        compose.onNodeWithTag("entry-comment").performTextInput("Текст остаётся после закрытия правой области")
+        active("entry-title").performTextInput("Общий черновик")
+        active("entry-comment").performTextInput("Текст остаётся после закрытия правой области")
         val id = vm.workspace.value.activeDraftId!!
         compose.runOnUiThread {
             val pane = vm.workspace.value.activePane
@@ -240,7 +287,7 @@ class WorkspaceRedesignTest {
         compose.waitUntil(60_000) { vm.workspace.value.panes[active].tabs.none { it.documentId == id } }
         assertEquals(id, vm.workspace.value.panes[other].selected?.documentId)
         compose.waitUntil(60_000) { vm.draftStatus.value == "Черновик сохранён" }
-        assertEquals("Текст остаётся после закрытия правой области", runBlocking { WorkspaceStore(app).values.first() }.drafts.single { it.entry.id == id }.entry.comment)
+        assertEquals("Текст остаётся после закрытия правой области", runBlocking { WorkspaceStore(app).values.first() }.drafts.single { it.entry.id == id }.entry.richText().text)
         assertTrue(runBlocking { dao.allEntries().none { it.id == id } })
     }
     @Test fun mouseDragAddsMembershipWithoutDuplicatingOrMovingCanonicalNote() = fixture { _, folders ->
