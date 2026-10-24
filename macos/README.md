@@ -4,6 +4,8 @@
 
 ## Установка
 
+[Скачать DMG для MacBook Neo / Apple Silicon](https://github.com/rampe22mesler-dot/readerka/releases/download/v1.0.0-macos/readerka-1.0.0-macos-arm64.dmg) · [DMG для Intel](https://github.com/rampe22mesler-dot/readerka/releases/download/v1.0.0-macos/readerka-1.0.0-macos-x64.dmg) · [Все файлы релиза, ZIP и SHA-256](https://github.com/rampe22mesler-dot/readerka/releases/tag/v1.0.0-macos)
+
 macOS 12 или новее. Для Mac на Apple Silicon, включая **MacBook Neo** и модели с чипами M1 и новее, выбирайте `readerka-1.0.0-macos-arm64.dmg`, для Intel — `readerka-1.0.0-macos-x64.dmg`. Откройте DMG и перенесите `Readerka.app` в «Программы». Альтернативный ZIP содержит ту же `.app`; распакуйте его полностью. Java и декодер DjVu уже включены, Homebrew не нужен.
 
 Сборки имеют техническую ad-hoc подпись, без сертификата Apple Developer ID и нотарификации. Если macOS блокирует первый запуск, попробуйте открыть приложение, затем выберите «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть» и подтвердите запуск. Отключать Gatekeeper целиком не нужно.

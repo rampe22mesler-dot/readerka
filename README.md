@@ -1,5 +1,7 @@
 # Readerka 1.0.0 для Windows и macOS
 
+[Скачать для MacBook Neo / Apple Silicon — DMG](https://github.com/rampe22mesler-dot/readerka/releases/download/v1.0.0-macos/readerka-1.0.0-macos-arm64.dmg) · [Mac Intel — DMG](https://github.com/rampe22mesler-dot/readerka/releases/download/v1.0.0-macos/readerka-1.0.0-macos-x64.dmg) · [Все файлы macOS, ZIP и SHA-256](https://github.com/rampe22mesler-dot/readerka/releases/tag/v1.0.0-macos)
+
 [Версия для macOS: установка и сборка DMG/ZIP](macos/README.md) · [Сборки Intel и Apple Silicon в Actions](https://github.com/rampe22mesler-dot/readerka/actions/workflows/macos.yml)
 
 macOS-версия использует общую настольную основу 1.0.0, поддерживает ⌘, системное меню, Связку ключей и перенос библиотеки ZIP с Windows. Java и нативный DjVuLibre включаются в `.app`. Подробности и требования — в `macos/README.md`.
