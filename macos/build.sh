@@ -67,6 +67,10 @@ if [[ $actual_version != "Readerka $version" ]]; then echo "Launcher version mis
 env -u READERKA_DJVU_DIR "$image/Contents/runtime/Contents/Home/bin/java" -Djava.awt.headless=true \
     -cp "$image/Contents/app/*:$build/classes/kotlin/test" org.readerka.desktop.MacReleaseSmoke \
     "$project_root/windows/desktop/src/test/resources/formats/mixed.djvu"
+# Launch the real entry point in a graphical session and check Command actions and persistence.
+env -u READERKA_DJVU_DIR perl -e 'alarm 90; exec @ARGV' \
+    "$image/Contents/runtime/Contents/Home/bin/java" -Djava.awt.headless=false \
+    -cp "$image/Contents/app/*:$build/classes/kotlin/test" org.readerka.desktop.MacWindowSmoke
 jpackage --type dmg --name Readerka --app-version "$version" --vendor Readerka \
     --app-image "$image" --dest "$work/dmg" --mac-package-identifier org.readerka.desktop
 dmg=("$work/dmg/"*.dmg)

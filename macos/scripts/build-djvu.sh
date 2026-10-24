@@ -56,7 +56,7 @@ cp "$work/djvulibre-3.5.29/config/config.sub" "$work/jpeg-6b/config.sub"
 )
 (
     cd "$work/djvulibre-3.5.29"
-    JPEG_CFLAGS="-I$stage/include" JPEG_LIBS="$stage/lib/libjpeg.a" \
+    JPEG_CFLAGS="-I$stage/include" JPEG_LIBS="-L$stage/lib -ljpeg" \
     TIFF_CFLAGS="-I$stage/include" TIFF_LIBS="$stage/lib/libtiff.a $stage/lib/libjpeg.a $stage/lib/libz.a -lm" \
         ./configure --prefix="$stage" --disable-shared --enable-static --disable-xmltools --disable-desktopfiles
     make -C libdjvu -j"$jobs"
