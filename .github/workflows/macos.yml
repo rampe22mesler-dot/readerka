@@ -2,6 +2,15 @@ name: macOS desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish the verified installers as a GitHub release
+        type: boolean
+        default: false
+      artifacts_run_id:
+        description: Optional successful macOS build run to reuse without rebuilding
+        type: string
+        default: ''
   push:
     branches: [main, 'codex/macos*']
     paths: ['windows/**', 'macos/**', '.github/workflows/macos.yml']
@@ -13,6 +22,7 @@ permissions:
 
 jobs:
   package:
+    if: github.event_name != 'workflow_dispatch' || inputs.artifacts_run_id == ''
     name: macOS ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -46,3 +56,79 @@ jobs:
           path: |
             windows/desktop/build/reports/tests/
             windows/shared/build/reports/tests/
+
+  release:
+    needs: package
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' && inputs.publish_release &&
+      (needs.package.result == 'success' || (needs.package.result == 'skipped' && inputs.artifacts_run_id != ''))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.artifacts_run_id || github.run_id }}
+      PACKAGE_RESULT: ${{ needs.package.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify the source of the tested installers
+        id: source
+        shell: bash
+        run: |
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          details=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" --jq '[.conclusion // "pending", .head_sha, .path, .head_repository.full_name] | @tsv')
+          IFS=$'\t' read -r conclusion build_sha workflow repository <<< "$details"
+          [[ "$repository" == "$GITHUB_REPOSITORY" && "$workflow" == '.github/workflows/macos.yml' ]]
+          [[ "$build_sha" =~ ^[a-f0-9]{40}$ ]]
+          if [[ "$SOURCE_RUN" == "$GITHUB_RUN_ID" ]]; then
+            [[ "$PACKAGE_RESULT" == success ]]
+          else
+            [[ "$conclusion" == success ]]
+          fi
+          # Documentation and workflow follow-ups can reuse the same tested application inputs.
+          git diff --exit-code "$build_sha" HEAD -- windows/desktop windows/shared windows/third-party windows/docs windows/gradle.properties windows/build.gradle.kts windows/settings.gradle.kts macos/build.sh macos/scripts
+          echo "sha=$build_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: readerka-macos-arm64
+          path: release/arm64
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: readerka-macos-x64
+          path: release/x64
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Verify checksums and publish
+        env:
+          BUILD_SHA: ${{ steps.source.outputs.sha }}
+        shell: bash
+        run: |
+          (cd release/arm64 && sha256sum -c SHA256SUMS.txt)
+          (cd release/x64 && sha256sum -c SHA256SUMS.txt)
+          cat release/arm64/SHA256SUMS.txt release/x64/SHA256SUMS.txt | sort -k2 > release/SHA256SUMS-macos.txt
+          version=$(git show "$BUILD_SHA:windows/gradle.properties" | sed -n 's/^version=//p')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version-macos"
+          git archive --format=zip --prefix="readerka-$version-macos/" -o "release/readerka-$version-macos-source.zip" "$BUILD_SHA"
+          cat > release/notes.md <<'NOTES'
+          Readerka для macOS 12 и новее. Java и DjVuLibre включены.
+
+          **MacBook Neo и другие Mac на Apple Silicon:** скачайте файл `macos-arm64.dmg` (или ZIP). Для Intel выбирайте `macos-x64.dmg`.
+
+          Откройте DMG и перенесите Readerka.app в «Программы». Библиотека хранится отдельно в `~/Library/Application Support/Readerka`. Перенос с Windows 1.0.0: «Файл → Синхронизация», полный ZIP библиотеки формата 5.
+
+          Доступны системное меню macOS, клавиши ⌘, Связка ключей для Dropbox, PDF/EPUB/FB2/DjVu, цитаты, заметки, конспекты, исследовательские поля и граф библиотеки.
+
+          Обе архитектуры проверены на macOS: тесты, встроенная Java, SQLite, импорт кириллицы, PDF, DjVu и запуск настоящего окна с редактированием и сохранением при закрытии. Проверки выполнены на Mac-раннерах GitHub, отдельно на физическом MacBook Neo приложение не проверялось.
+
+          Подпись техническая ad-hoc, без Apple Developer ID и нотарификации. Если первый запуск заблокирован, откройте «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть». Windows-релиз 1.0.0 сохранён.
+          NOTES
+          gh release create "$tag" --target "$BUILD_SHA" --title "Readerka $version для macOS" --notes-file release/notes.md --draft --latest=false
+          gh release upload "$tag" release/arm64/*.dmg release/arm64/*.zip release/x64/*.dmg release/x64/*.zip release/SHA256SUMS-macos.txt "release/readerka-$version-macos-source.zip"
+          gh release edit "$tag" --draft=false --latest=false
