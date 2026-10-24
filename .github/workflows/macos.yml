@@ -129,6 +129,12 @@ jobs:
 
           Подпись техническая ad-hoc, без Apple Developer ID и нотарификации. Если первый запуск заблокирован, откройте «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть». Windows-релиз 1.0.0 сохранён.
           NOTES
-          gh release create "$tag" --target "$BUILD_SHA" --title "Readerka $version для macOS" --notes-file release/notes.md --draft --latest=false
+          # Resume an owner-created draft when repository policy restricts release creation by Actions.
+          if gh release view "$tag" --json isDraft --jq .isDraft > release/existing-draft.txt; then
+            [[ "$(cat release/existing-draft.txt)" == true ]]
+            [[ "$(git rev-list -n1 "$tag")" == "$BUILD_SHA" ]]
+          else
+            gh release create "$tag" --target "$BUILD_SHA" --title "Readerka $version для macOS" --notes-file release/notes.md --draft --latest=false
+          fi
           gh release upload "$tag" release/arm64/*.dmg release/arm64/*.zip release/x64/*.dmg release/x64/*.zip release/SHA256SUMS-macos.txt "release/readerka-$version-macos-source.zip"
           gh release edit "$tag" --draft=false --latest=false
