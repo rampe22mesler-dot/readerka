@@ -228,7 +228,7 @@ class RichEditor(
                 }
 
                 override fun mouseClicked(e: MouseEvent) {
-                    if (preview || e.isControlDown) {
+                    if (preview || DesktopPlatform.isShortcutDown(e)) {
                         val at = textPane.viewToModel2D(e.point)
                         val link =
                             rich.marks

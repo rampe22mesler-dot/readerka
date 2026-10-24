@@ -135,7 +135,7 @@ class PdfPanel(val app: DesktopWindow, val id: String) : JPanel(BorderLayout()),
         pageField.addChangeListener {
             if (pageField.value as Int != page + 1) go((pageField.value as Int) - 1)
         }
-        getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke("control D"), "bookmark")
+        getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(DesktopPlatform.keyStroke("control D"), "bookmark")
         actionMap.put("bookmark", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent) { bookmark() }
         })
@@ -152,7 +152,7 @@ class PdfPanel(val app: DesktopWindow, val id: String) : JPanel(BorderLayout()),
         scroll.addMouseWheelListener { e ->
             e.consume()
             canvas.requestFocusInWindow()
-            if (e.isControlDown) {
+            if (DesktopPlatform.isShortcutDown(e)) {
                 changeZoom(-e.preciseWheelRotation, SwingUtilities.convertPoint(e.component, e.point, scroll.viewport))
             } else if (e.preciseWheelRotation != 0.0 && image != null && !restoringPosition) {
                 val bar = if (e.isShiftDown) scroll.horizontalScrollBar else scroll.verticalScrollBar
@@ -166,7 +166,7 @@ class PdfPanel(val app: DesktopWindow, val id: String) : JPanel(BorderLayout()),
         listOf("LEFT" to -1, "UP" to -1, "PAGE_UP" to -1,
             "RIGHT" to 1, "DOWN" to 1, "PAGE_DOWN" to 1).forEach { (key, delta) ->
             val action = "pdf-page-$key"
-            val stroke = KeyStroke.getKeyStroke(key)
+            val stroke = DesktopPlatform.keyStroke(key)
             canvas.getInputMap(WHEN_FOCUSED).put(stroke, action)
             getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, action)
             actionMap.put(action, object : AbstractAction() {
@@ -601,7 +601,7 @@ class PdfPanel(val app: DesktopWindow, val id: String) : JPanel(BorderLayout()),
         listOf("control shift Q" to quote, "control alt A" to consp, "control alt L" to research).forEach { (key, button) ->
             dialog.rootPane
                 .getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(KeyStroke.getKeyStroke(key), key)
+                .put(DesktopPlatform.keyStroke(key), key)
             dialog.rootPane.actionMap.put(
                 key,
                 object : AbstractAction() {

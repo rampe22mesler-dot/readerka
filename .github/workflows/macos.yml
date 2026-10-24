@@ -1,0 +1,48 @@
+name: macOS desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'codex/macos*']
+    paths: ['windows/**', 'macos/**', '.github/workflows/macos.yml']
+  pull_request:
+    paths: ['windows/**', 'macos/**', '.github/workflows/macos.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x64
+          - os: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build decoders, test and package DMG / ZIP
+        run: bash macos/build.sh
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: readerka-macos-${{ matrix.arch }}
+          path: windows/desktop/build/release/macos-${{ matrix.arch }}/
+          if-no-files-found: error
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readerka-macos-${{ matrix.arch }}-tests
+          path: |
+            windows/desktop/build/reports/tests/
+            windows/shared/build/reports/tests/

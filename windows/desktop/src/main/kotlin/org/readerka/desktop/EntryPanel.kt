@@ -123,7 +123,7 @@ class EntryPanel(val app: DesktopWindow, val id: String) : JPanel(BorderLayout()
                 }
             }
             fun quoteAction(key: String, action: () -> Unit) {
-                quotation.inputMap.put(KeyStroke.getKeyStroke(key), key)
+                quotation.inputMap.put(DesktopPlatform.keyStroke(key), key)
                 quotation.actionMap.put(key, object : AbstractAction() {
                     override fun actionPerformed(e: java.awt.event.ActionEvent) = action()
                 })
@@ -173,9 +173,9 @@ class EntryPanel(val app: DesktopWindow, val id: String) : JPanel(BorderLayout()
                 iconButton("more", "Действия записи") {
                     JPopupMenu().apply {
                         add(JMenu("Форматирование").apply { formatMenu().components.toList().forEach { add(it) } })
-                        add(JMenuItem("Вставить ссылку · Ctrl+K").apply { addActionListener { link() } })
+                        add(JMenuItem(DesktopPlatform.shortcutText("Вставить ссылку · Ctrl+K")).apply { addActionListener { link() } })
                         add(JMenuItem("Каталог вставки").apply { addActionListener { insertCatalogue() } })
-                        add(JMenuItem("Добавить на исследовательское поле · Ctrl+Alt+L").apply { addActionListener { app.safe { app.addToResearchField(listOf(id)) } } })
+                        add(JMenuItem(DesktopPlatform.shortcutText("Добавить на исследовательское поле · Ctrl+Alt+L")).apply { addActionListener { app.safe { app.addToResearchField(listOf(id)) } } })
                         addSeparator()
                         add(JMenuItem("Свойства").apply { addActionListener { app.safe { app.entryProperties(id) } } })
                         add(JMenuItem("История версий").apply { addActionListener { versions() } })

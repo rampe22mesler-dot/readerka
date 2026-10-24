@@ -102,12 +102,14 @@ private class ButtonMotion(private val button: AbstractButton) {
     }
 }
 
-class MotionButton(text: String = "", icon: Icon? = null) : JButton(text, icon) {
+class MotionButton(text: String = "", icon: Icon? = null) : JButton(DesktopPlatform.shortcutText(text), icon) {
+    override fun setToolTipText(text: String?) { super.setToolTipText(text?.let(DesktopPlatform::shortcutText)) }
     private val motion = ButtonMotion(this)
     override fun paintComponent(g: Graphics) { motion.paint(g); super.paintComponent(g) }
 }
 
-class MotionToggleButton(text: String) : JToggleButton(text) {
+class MotionToggleButton(text: String) : JToggleButton(DesktopPlatform.shortcutText(text)) {
+    override fun setToolTipText(text: String?) { super.setToolTipText(text?.let(DesktopPlatform::shortcutText)) }
     private val motion = ButtonMotion(this)
     override fun paintComponent(g: Graphics) { motion.paint(g); super.paintComponent(g) }
 }

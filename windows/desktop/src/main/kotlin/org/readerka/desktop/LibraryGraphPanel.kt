@@ -313,7 +313,7 @@ class LibraryGraphPanel(private val app: DesktopWindow) : JPanel(BorderLayout())
         }
         surface.addMouseListener(mouse); surface.addMouseMotionListener(mouse); surface.addMouseWheelListener(mouse)
         listOf("ESCAPE" to { select(null) }, "ENTER" to { openSelected() }, "HOME" to { fit() }).forEachIndexed { i, (key, action) ->
-            surface.getInputMap(WHEN_FOCUSED).put(KeyStroke.getKeyStroke(key), "graph-$i")
+            surface.getInputMap(WHEN_FOCUSED).put(DesktopPlatform.keyStroke(key), "graph-$i")
             surface.actionMap.put("graph-$i", object : AbstractAction() { override fun actionPerformed(e: ActionEvent) = action() })
         }
     }

@@ -108,7 +108,7 @@ class BookMaterialsPanel(val app: DesktopWindow, val pdf: PdfPanel, val bookId: 
                     menu().show(tree, e.x, e.y)
                 }
             })
-            tree.inputMap.put(KeyStroke.getKeyStroke("ENTER"), "open")
+            tree.inputMap.put(DesktopPlatform.keyStroke("ENTER"), "open")
             tree.actionMap.put("open", object : AbstractAction() {
                 override fun actionPerformed(e: ActionEvent) { open() }
             })
@@ -195,7 +195,7 @@ class BookMaterialsPanel(val app: DesktopWindow, val pdf: PdfPanel, val bookId: 
         private fun installDragAndDrop() {
             tree.dragEnabled = !GraphicsEnvironment.isHeadless()
             tree.dropMode = DropMode.ON_OR_INSERT
-            tree.toolTipText = "Перетащите в папку; Ctrl + перетаскивание добавляет цитату в ещё одну папку"
+            tree.toolTipText = "Перетащите в папку; ${if (DesktopPlatform.isMac) "Alt" else "Ctrl"} + перетаскивание добавляет цитату в ещё одну папку"
             tree.transferHandler = object : TransferHandler() {
                 override fun getSourceActions(c: JComponent) = if (occurrences().all { it.item.kind == ReaderItemKind.Quote }) COPY_OR_MOVE else MOVE
                 override fun createTransferable(c: JComponent): Transferable? {

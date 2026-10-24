@@ -15,19 +15,21 @@ internal object DjvuConverter {
     private val nativeFiles = listOf("ddjvu.exe", "djvused.exe", "libdjvulibre.dll", "libjpeg.dll", "libtiff.dll", "libz.dll", "msvcp140.dll", "vcruntime140.dll")
 
     fun convert(source: File, target: File) {
-        require(System.getProperty("os.name").startsWith("Windows")) { "Декодер DJVU этой сборки предназначен для Windows" }
         require(source.length() <= 512L * 1024 * 1024) { "DJVU превышает 512 МБ" }
         val work = Files.createTempDirectory(target.parentFile.toPath(), ".djvu-").toFile()
         try {
-            nativeFiles.forEach { name ->
+            val windows = System.getProperty("os.name").startsWith("Windows")
+            val decoder = if (windows) work else decoderDirectory()
+            if (windows) nativeFiles.forEach { name ->
                 val resource = javaClass.getResourceAsStream("/native/djvu/$name") ?: error("В сборке отсутствует декодер DJVU: $name")
                 resource.use { input -> File(work, name).outputStream().use { input.copyTo(it) } }
             }
             // Relative ASCII arguments work even with Cyrillic source names and library paths.
             source.copyTo(File(work, "source.djvu"))
-            run(work, "ddjvu.exe", listOf("-format=pdf", "-size=3000x3000", "source.djvu", "pages.pdf"), "decode.log")
-            run(work, "djvused.exe", listOf("-u", "-e", "select; print-txt", "source.djvu"), "text.txt")
-            run(work, "djvused.exe", listOf("-u", "-e", "select; size", "source.djvu"), "sizes.txt")
+            val suffix = if (windows) ".exe" else ""
+            run(work, File(decoder, "ddjvu$suffix"), listOf("-format=pdf", "-size=3000x3000", "source.djvu", "pages.pdf"), "decode.log")
+            run(work, File(decoder, "djvused$suffix"), listOf("-u", "-e", "select; print-txt", "source.djvu"), "text.txt")
+            run(work, File(decoder, "djvused$suffix"), listOf("-u", "-e", "select; size", "source.djvu"), "sizes.txt")
             val rawText = File(work, "text.txt")
             require(rawText.length() <= 64L * 1024 * 1024) { "Текстовый слой DJVU превышает 64 МБ" }
             val pages = parseText(rawText.readText(Charsets.UTF_8).removePrefix("\uFEFF"))
@@ -74,9 +76,19 @@ internal object DjvuConverter {
         } finally { work.deleteRecursively() }
     }
 
-    private fun run(work: File, executable: String, args: List<String>, logName: String) {
+    private fun decoderDirectory(): File {
+        val directory = System.getProperty("readerka.djvu.dir") ?: System.getenv("READERKA_DJVU_DIR")
+        val besideJar = File(javaClass.protectionDomain.codeSource.location.toURI()).parentFile
+        return (directory?.let(::File) ?: File(besideJar, "native/djvu")).also { folder ->
+            require(listOf("ddjvu", "djvused").all { File(folder, it).canExecute() }) {
+                "В сборке отсутствует декодер DjVuLibre. Для запуска из исходников сначала выполните macos/scripts/build-djvu.sh и задайте READERKA_DJVU_DIR."
+            }
+        }
+    }
+
+    private fun run(work: File, executable: File, args: List<String>, logName: String) {
         val log = File(work, logName)
-        val process = ProcessBuilder(listOf(File(work, executable).absolutePath) + args)
+        val process = ProcessBuilder(listOf(executable.absolutePath) + args)
             .directory(work).redirectError(File(work, "$logName.err")).redirectOutput(log).start()
         try {
             check(process.waitFor(10, TimeUnit.MINUTES)) { "Превышено время импорта DJVU (10 минут)" }

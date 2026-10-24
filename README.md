@@ -1,4 +1,8 @@
-# Readerka 1.0.0 для Windows
+# Readerka 1.0.0 для Windows и macOS
+
+[Версия для macOS: установка и сборка DMG/ZIP](macos/README.md) · [Сборки Intel и Apple Silicon в Actions](https://github.com/rampe22mesler-dot/readerka/actions/workflows/macos.yml)
+
+macOS-версия использует общую настольную основу 1.0.0, поддерживает ⌘, системное меню, Связку ключей и перенос библиотеки ZIP с Windows. Java и нативный DjVuLibre включаются в `.app`. Подробности и требования — в `macos/README.md`.
 
 [Скачать установщик MSI](https://github.com/rampe22mesler-dot/readerka/releases/download/v1.0.0/readerka-1.0.0-windows-x64.msi) · [Все файлы релиза 1.0.0](https://github.com/rampe22mesler-dot/readerka/releases/tag/v1.0.0) · [Исходники и сборка Windows](windows/README.md)
 

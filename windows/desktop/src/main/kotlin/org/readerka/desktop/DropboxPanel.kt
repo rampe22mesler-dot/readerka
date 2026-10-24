@@ -29,7 +29,9 @@ class DropboxPanel(private val app: DesktopWindow) : JPanel(BorderLayout(0, 12))
             "Скопируйте App key со вкладки Settings в поле выше. App secret не требуется. " +
             "На другом устройстве укажите тот же App key, чтобы открыть ту же облачную копию.\n\n" +
             "«Войти в Dropbox» откроет системный браузер. Разрешите доступ и вставьте выданный Dropbox код в Readerka. " +
-            "Вход хранится с защитой Windows для текущего пользователя и не входит в ZIP. Архив библиотеки не зашифрован."
+            (if (DesktopPlatform.isMac) "Вход хранится в Связке ключей macOS и не входит в ZIP. "
+                else "Вход хранится с защитой Windows для текущего пользователя и не входит в ZIP. ") +
+            "Архив библиотеки не зашифрован."
         ).apply {
             isEditable = false; lineWrap = true; wrapStyleWord = true
             background = this@DropboxPanel.background; caretPosition = 0

@@ -27,11 +27,15 @@ class HelpPanel(commands: Map<String, DesktopCommand>, libraryPath: String) : JP
         name = "help-tabs"
         tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
     }
-    private val browsers = listOf(
-        HelpBrowser(HelpContent.reference(libraryPath)),
-        HelpBrowser(HelpContent.guide()),
-        HelpBrowser(HelpContent.shortcuts(commands)),
-    )
+    private val browsers = listOf(HelpContent.reference(libraryPath), HelpContent.guide(), HelpContent.shortcuts(commands))
+        .map { topics -> HelpBrowser(topics.map { topic ->
+            var body = DesktopPlatform.shortcutText(topic.body)
+            if (DesktopPlatform.isMac) body = body
+                .replace("⌘+Tab / ⌘+Shift+Tab", "Ctrl+Tab / Ctrl+Shift+Tab")
+                .replace("⌘+стрелки", "Alt+← / Alt+→")
+                .replace("⌘+перетаскивание цитаты", "Alt+перетаскивание цитаты")
+            topic.copy(body = body)
+        }) }
     private val titles = listOf("Функции", "Практический гайд", "Горячие клавиши")
 
     init {

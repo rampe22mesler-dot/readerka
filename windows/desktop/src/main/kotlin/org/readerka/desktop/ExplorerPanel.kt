@@ -77,7 +77,7 @@ class ExplorerPanel(private val app: DesktopWindow) : JPanel(BorderLayout()) {
         })
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                if (SwingUtilities.isLeftMouseButton(e) && e.clickCount == 1 && !e.isControlDown && !e.isShiftDown) {
+                if (SwingUtilities.isLeftMouseButton(e) && e.clickCount == 1 && !e.isPopupTrigger && !(DesktopPlatform.isMac && e.isControlDown) && !DesktopPlatform.isShortcutDown(e) && !e.isShiftDown) {
                     val path = tree.getPathForLocation(e.x, e.y) ?: return
                     if (e.x >= (tree.getPathBounds(path)?.x ?: 0)) node(path)?.takeIf { it.item.kind in listOf("entry", "pdf", "research") }?.let { open(it) }
                 }
@@ -158,7 +158,7 @@ class ExplorerPanel(private val app: DesktopWindow) : JPanel(BorderLayout()) {
     fun nodes() = tree.selectionPaths.orEmpty().mapNotNull(::node)
     fun selectedItems() = nodes().map { it.item }.filter { it.kind != "section" }
     private fun bind(key: String, action: () -> Unit) {
-        tree.inputMap.put(KeyStroke.getKeyStroke(key), key)
+        tree.inputMap.put(DesktopPlatform.keyStroke(key), key)
         tree.actionMap.put(key, object : AbstractAction() { override fun actionPerformed(e: ActionEvent) = app.safe(action) })
     }
     private fun open(n: ExplorerNode, right: Boolean = false) {
@@ -338,7 +338,7 @@ class ExplorerPanel(private val app: DesktopWindow) : JPanel(BorderLayout()) {
         item("Добавить книгу в выбранную папку", context().first == 0) { app.commands["pdf"]?.action?.invoke() }
         addSeparator()
         item("Переименовать   F2", selected.size == 1) { renameSelected() }
-        item("Переместить…   Ctrl+M", selected.isNotEmpty() && selected.none { it.kind == "research" }) { chooseDestination(false) }
+        item(DesktopPlatform.shortcutText("Переместить…   Ctrl+M"), selected.isNotEmpty() && selected.none { it.kind == "research" }) { chooseDestination(false) }
         item("Добавить в дополнительную папку…", selected.isNotEmpty() && selected.all { it.kind == "entry" }) { chooseDestination(true) }
         item("Убрать из этой папки", selected.any { it.kind == "entry" && it.parent != null }) { removeMemberships() }
         item("Свойства", selected.size == 1 && selected.first().kind in listOf("entry", "pdf")) { selected.single().let { if (it.kind == "entry") app.entryProperties(it.id) else app.documentProperties(it.id) } }
