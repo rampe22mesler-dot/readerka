@@ -24,11 +24,11 @@ object MacWindowSmoke {
                 window.openEntry(note.id)
                 window.editors.getValue(note.id).editor.textPane.replaceSelection("Проверка окна macOS")
                 window.commands.getValue("save").action()
-                check(window.session.repository.snapshot().entries.single().text.contains("Проверка окна macOS"))
+                check(window.session.repository.snapshot().entries.single().content?.text?.contains("Проверка окна macOS") == true)
                 window.dispatchEvent(WindowEvent(window, WindowEvent.WINDOW_CLOSING))
                 check(!window.isDisplayable)
             }
-            DesktopRepository(root).use { check(it.snapshot().entries.single().text.contains("Проверка окна macOS")) }
+            DesktopRepository(root).use { check(it.snapshot().entries.single().content?.text?.contains("Проверка окна macOS") == true) }
             println("macOS window: native menu, Command shortcuts, editing and safe close OK")
         } catch (error: Throwable) {
             error.printStackTrace()
