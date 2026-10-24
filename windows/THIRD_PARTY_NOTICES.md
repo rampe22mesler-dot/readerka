@@ -16,6 +16,7 @@
 | Xerial SQLite JDBC | 3.49.1.0 | Apache-2.0 / BSD; https://github.com/xerial/sqlite-jdbc/tree/3.49.1.0 |
 | SQLite | 3.49.1 | Public domain; https://sqlite.org/ |
 | SLF4J API / NOP | 2.0.17 | MIT; https://github.com/qos-ch/slf4j/tree/v_2.0.17 |
+| JNA | 5.17.0 | Apache-2.0; https://github.com/java-native-access/jna/tree/5.17.0; доступ к Связке ключей в macOS |
 | DjVuLibre decoder | 3.5.29 | GPL-2.0-or-later; https://sourceforge.net/projects/djvu/files/DjVuLibre/3.5.29/ |
 | IJG JPEG library | 6b | IJG license; https://www.ijg.org/files/jpegsrc.v6b.tar.gz |
 | libtiff | 4.0.10 | libtiff license; https://download.osgeo.org/libtiff/tiff-4.0.10.tar.gz |

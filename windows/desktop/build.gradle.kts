@@ -11,6 +11,7 @@ dependencies {
     implementation("org.apache.pdfbox:pdfbox:2.0.33")
     implementation("org.apache.pdfbox:jbig2-imageio:3.0.4")
     implementation("org.slf4j:slf4j-nop:2.0.17")
+    implementation("net.java.dev.jna:jna:5.17.0")
     testImplementation("junit:junit:4.13.2")
 }
 application { mainClass = "org.readerka.desktop.MainKt" }
@@ -20,10 +21,15 @@ tasks.jar {
         attributes("Implementation-Version" to project.version, "Main-Class" to application.mainClass.get())
     }
 }
-tasks.register<Sync>("windowsLibraries") {
+val desktopLibraries by tasks.registering(Sync::class) {
     dependsOn(tasks.jar)
     from(configurations.runtimeClasspath)
     from(tasks.jar)
+    into(layout.buildDirectory.dir("desktop/lib"))
+}
+tasks.register<Sync>("windowsLibraries") {
+    dependsOn(desktopLibraries)
+    from(desktopLibraries)
     into(layout.buildDirectory.dir("windows/lib"))
 }
 tasks.register<JavaExec>("interopFixture") {
@@ -41,4 +47,5 @@ tasks.register<JavaExec>("verifyInterop") {
 tasks.test {
     systemProperty("java.awt.headless", providers.systemProperty("java.awt.headless").orElse("true").get())
     inputs.property("desktopDisplay", providers.environmentVariable("DISPLAY").orElse(""))
+    inputs.property("djvuDirectory", providers.environmentVariable("READERKA_DJVU_DIR").orElse(""))
 }

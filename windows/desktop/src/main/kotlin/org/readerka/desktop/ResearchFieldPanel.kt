@@ -21,7 +21,7 @@ class ResearchFieldPanel(val app: DesktopWindow, val id: String) : JPanel(Border
     private var marquee: Rectangle? = null
     private val cards = linkedMapOf<String, Card>()
     private val zoomLabel = JLabel()
-    private val hint = JLabel("Заголовок — перемещение · Ctrl — выбор · пустое место — рамка · Alt/средняя кнопка — панорама · Ctrl+колесо — масштаб")
+    private val hint = JLabel(DesktopPlatform.shortcutText("Заголовок — перемещение · Ctrl — выбор · пустое место — рамка · Alt/средняя кнопка — панорама · Ctrl+колесо — масштаб"))
     private val viewTimer = Timer(300) { persistView() }.apply { isRepeats = false }
     private val surface = object : JPanel(null) {
         override fun paintComponent(graphics: Graphics) {
@@ -102,7 +102,7 @@ class ResearchFieldPanel(val app: DesktopWindow, val id: String) : JPanel(Border
         listOf("control Z" to { undo() }, "control Y" to { redo() }, "DELETE" to { removeSelected() },
             "control A" to { selected.addAll(field.placements.map { it.id }); refreshSelection() }).forEachIndexed { i, (key, action) ->
             // Focused text components keep their own selection/copy shortcuts.
-            surface.getInputMap(WHEN_FOCUSED).put(KeyStroke.getKeyStroke(key), "research-$i")
+            surface.getInputMap(WHEN_FOCUSED).put(DesktopPlatform.keyStroke(key), "research-$i")
             surface.actionMap.put("research-$i", object : AbstractAction() { override fun actionPerformed(e: ActionEvent) { app.safe(action) } })
         }
         refreshCards()
@@ -350,7 +350,7 @@ class ResearchFieldPanel(val app: DesktopWindow, val id: String) : JPanel(Border
                 if (SwingUtilities.isRightMouseButton(e)) return
                 gesture = field; panning = SwingUtilities.isMiddleMouseButton(e) || e.isAltDown
                 movingGroup = !panning && group != null
-                prior = if (e.isControlDown || e.isShiftDown) selected.toSet() else emptySet()
+                prior = if (DesktopPlatform.isShortcutDown(e) || e.isShiftDown) selected.toSet() else emptySet()
                 if (movingGroup) { selected.clear(); selected.addAll(field.placements.filter { it.groupId == group!!.id }.map { it.id }) }
                 else if (!panning && prior.isEmpty()) selected.clear()
                 refreshSelection()
@@ -378,7 +378,7 @@ class ResearchFieldPanel(val app: DesktopWindow, val id: String) : JPanel(Border
         surface.addMouseListener(mouse); surface.addMouseMotionListener(mouse)
         surface.addMouseWheelListener { e ->
             if (gesture != null) return@addMouseWheelListener
-            if (e.isControlDown) zoom(field.zoom * 1.12.pow(-e.preciseWheelRotation), e.point)
+            if (DesktopPlatform.isShortcutDown(e)) zoom(field.zoom * 1.12.pow(-e.preciseWheelRotation), e.point)
             else { field = if (e.isShiftDown) field.copy(viewX = field.viewX + e.preciseWheelRotation*50/field.zoom)
                 else field.copy(viewY = field.viewY + e.preciseWheelRotation*50/field.zoom); layoutCards() }
             e.consume(); viewTimer.restart()
@@ -403,7 +403,7 @@ class ResearchFieldPanel(val app: DesktopWindow, val id: String) : JPanel(Border
             add(JScrollPane(body).apply { border = BorderFactory.createEmptyBorder() }, BorderLayout.CENTER)
             add(grip, BorderLayout.SOUTH)
             body.addMouseListener(object : MouseAdapter() { override fun mousePressed(e: MouseEvent) {
-                if (!e.isControlDown && cardId !in selected) selected.clear()
+                if (!DesktopPlatform.isShortcutDown(e) && cardId !in selected) selected.clear()
                 selected.add(cardId); refreshSelection()
             } })
             fun gesture(resize: Boolean) = object : MouseAdapter() {
@@ -411,7 +411,7 @@ class ResearchFieldPanel(val app: DesktopWindow, val id: String) : JPanel(Border
                     if (e.isPopupTrigger) { popup().show(e.component, e.x, e.y); return }
                     if (!SwingUtilities.isLeftMouseButton(e)) return
                     surface.requestFocusInWindow()
-                    if (e.isControlDown || e.isShiftDown) { if (!selected.add(cardId)) selected.remove(cardId) }
+                    if (DesktopPlatform.isShortcutDown(e) || e.isShiftDown) { if (!selected.add(cardId)) selected.remove(cardId) }
                     else if (cardId !in selected) { selected.clear(); selected.add(cardId) }
                     if (resize) { selected.clear(); selected.add(cardId) }
                     refreshSelection(); origin = SwingUtilities.convertPoint(e.component, e.point, surface); gesture = field

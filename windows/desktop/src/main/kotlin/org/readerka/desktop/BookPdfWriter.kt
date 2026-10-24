@@ -17,8 +17,12 @@ internal sealed interface BookBlock {
 
 internal fun bookFont(pdf: PDDocument): PDType0Font {
     val windows = File(System.getenv("WINDIR") ?: "C:/Windows", "Fonts/arial.ttf")
-    val font = listOf(windows, File("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
-        .firstOrNull { it.isFile } ?: error("Не найден шрифт Arial для импорта книги")
+    val font = listOf(
+        windows,
+        File("/System/Library/Fonts/Supplemental/Arial.ttf"),
+        File("/Library/Fonts/Arial.ttf"),
+        File("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    ).firstOrNull { it.isFile } ?: error("Не найден шрифт Arial или DejaVu Sans для импорта книги")
     return PDType0Font.load(pdf, font)
 }
 

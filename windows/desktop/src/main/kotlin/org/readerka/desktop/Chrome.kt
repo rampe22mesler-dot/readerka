@@ -16,7 +16,7 @@ fun configureChrome() {
     val foreground = if (darkChrome()) Color(224, 228, 237) else Color(47, 54, 68)
     val surface = if (darkChrome()) Color(43, 47, 57) else Color(249, 250, 252)
     mapOf<String, Any>(
-        "defaultFont" to Font("Segoe UI", Font.PLAIN, 13),
+        "defaultFont" to Font(if (DesktopPlatform.isMac) "Helvetica Neue" else "Segoe UI", Font.PLAIN, 13),
         "control" to sidebarColor(), "text" to documentColor(),
         "Component.arc" to 10, "Button.arc" to 10, "TextComponent.arc" to 10,
         "Component.focusWidth" to 1, "Component.innerFocusWidth" to 0,

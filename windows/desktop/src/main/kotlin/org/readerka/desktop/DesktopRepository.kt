@@ -257,13 +257,7 @@ class DesktopRepository(val directory: File) : AutoCloseable {
     }
 
     companion object {
-        fun defaultDirectory(): File =
-            System.getenv("LOCALAPPDATA")?.let { File(it, "Readerka") }
-                ?: File(
-                    System.getenv("XDG_DATA_HOME")
-                        ?: "${System.getProperty("user.home")}/.local/share",
-                    "readerka",
-                )
+        fun defaultDirectory(): File = DesktopPlatform.dataDirectory()
 
         fun sha(file: File): String =
             file.inputStream().use { stream ->

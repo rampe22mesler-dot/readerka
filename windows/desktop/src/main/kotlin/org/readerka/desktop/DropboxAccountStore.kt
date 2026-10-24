@@ -8,16 +8,18 @@ import java.util.concurrent.TimeUnit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Per-library, per-Windows-user credentials; never included in library ZIPs. */
+/** Per-library credentials in Windows DPAPI or the macOS login keychain; never in library ZIPs. */
 class DropboxAccountStore(directory: File) {
     private val file = File(directory, "dropbox-account.dpapi")
-    fun exists() = file.isFile
+    private val keychain = if (DesktopPlatform.isMac) MacKeychainAccountStore(directory) else null
+    fun exists() = keychain?.exists() ?: file.isFile
     fun load(): DropboxCredentials {
-        val decrypted = protect(file.readText(), false)
+        val decrypted = keychain?.load() ?: protect(file.readText(), false)
         return try { Json.decodeFromString(decrypted) }
         catch (_: IllegalArgumentException) { error("Сохранённый вход Dropbox повреждён. Отключите аккаунт и войдите снова.") }
     }
     fun save(credentials: DropboxCredentials) {
+        keychain?.let { it.save(Json.encodeToString(credentials)); return }
         val encrypted = protect(Json.encodeToString(credentials), true)
         val temp = Files.createTempFile(file.parentFile.toPath(), "dropbox-account-", ".tmp")
         try {
@@ -25,7 +27,7 @@ class DropboxAccountStore(directory: File) {
             Files.move(temp, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } finally { Files.deleteIfExists(temp) }
     }
-    fun forget() { Files.deleteIfExists(file.toPath()) }
+    fun forget() { if (keychain != null) keychain.forget() else Files.deleteIfExists(file.toPath()) }
 
     private fun protect(value: String, encrypt: Boolean): String {
         check(System.getProperty("os.name").startsWith("Windows")) { "Сохранение входа Dropbox поддерживается только в Windows." }

@@ -235,8 +235,21 @@ class DesktopWindow(val session: LibrarySession) : JFrame("Readerka ${ReaderkaVe
         )
         registerCommands()
         installMenu()
-        (0 until jMenuBar.menuCount).map { jMenuBar.getMenu(it) }.forEach { applicationMenu.add(it) }
-        jMenuBar = null
+        if (DesktopPlatform.isMac) {
+            (0 until jMenuBar.menuCount).map { jMenuBar.getMenu(it) }.forEach { menu ->
+                applicationMenu.add(JMenu(menu.text).apply {
+                    menu.menuComponents.filterIsInstance<JMenuItem>().forEach { original ->
+                        add(JMenuItem(original.text).apply {
+                            accelerator = original.accelerator
+                            addActionListener { original.doClick() }
+                        })
+                    }
+                })
+            }
+        } else {
+            (0 until jMenuBar.menuCount).map { jMenuBar.getMenu(it) }.forEach { applicationMenu.add(it) }
+            jMenuBar = null
+        }
         session.onChange = {
             if (SwingUtilities.isEventDispatchThread()) {
                 synchronizeEditors()
@@ -1372,7 +1385,7 @@ class DesktopWindow(val session: LibrarySession) : JFrame("Readerka ${ReaderkaVe
             c.key?.let {
                 rootPane
                     .getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                    .put(KeyStroke.getKeyStroke(it), id)
+                    .put(DesktopPlatform.keyStroke(it), id)
                 rootPane.actionMap.put(
                     id,
                     object : AbstractAction() {
@@ -1395,7 +1408,7 @@ class DesktopWindow(val session: LibrarySession) : JFrame("Readerka ${ReaderkaVe
             val c =
                 commands.values.firstOrNull {
                     it.key != null &&
-                        KeyStroke.getKeyStroke(it.key) == KeyStroke.getKeyStrokeForEvent(e)
+                        DesktopPlatform.keyStroke(it.key) == KeyStroke.getKeyStrokeForEvent(e)
                 } ?: return@addKeyEventDispatcher false
             if (e.keyCode == KeyEvent.VK_Z && e.component !is JTextPane)
                 return@addKeyEventDispatcher false
@@ -1474,7 +1487,7 @@ class DesktopWindow(val session: LibrarySession) : JFrame("Readerka ${ReaderkaVe
                                     val c = commands.getValue(id)
                                     add(
                                         JMenuItem(c.title).apply {
-                                            c.key?.let { accelerator = KeyStroke.getKeyStroke(it) }
+                                            c.key?.let { accelerator = DesktopPlatform.keyStroke(it) }
                                             addActionListener { c.action() }
                                         }
                                     )
@@ -1632,9 +1645,9 @@ class DesktopWindow(val session: LibrarySession) : JFrame("Readerka ${ReaderkaVe
             add(flow(button("Закрыть") { dispose() }), BorderLayout.SOUTH)
         }
         dialog.rootPane.registerKeyboardAction({ dialog.dispose() },
-            KeyStroke.getKeyStroke("ESCAPE"), JComponent.WHEN_IN_FOCUSED_WINDOW)
+            DesktopPlatform.keyStroke("ESCAPE"), JComponent.WHEN_IN_FOCUSED_WINDOW)
         dialog.rootPane.registerKeyboardAction({ content.search.requestFocusInWindow(); content.search.selectAll() },
-            KeyStroke.getKeyStroke("control F"), JComponent.WHEN_IN_FOCUSED_WINDOW)
+            DesktopPlatform.keyStroke("control F"), JComponent.WHEN_IN_FOCUSED_WINDOW)
         val available = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
         dialog.minimumSize = Dimension(minOf(640, available.width), minOf(440, available.height))
         dialog.setSize(minOf(1080, available.width - 40), minOf(800, available.height - 60))
