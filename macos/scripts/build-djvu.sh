@@ -35,6 +35,12 @@ cp "$work/djvulibre-3.5.29/config/config.sub" "$work/jpeg-6b/config.sub"
 )
 (
     cd "$work/zlib-1.2.11"
+    # Current Apple SDKs define TARGET_OS_MAC for Darwin too. The old zlib test
+    # mistakes this for classic Mac OS and replaces the POSIX fdopen declaration.
+    if [[ $(uname -s) == Darwin ]]; then
+        sed 's/#if defined(MACOS) || defined(TARGET_OS_MAC)/#if defined(MACOS)/' zutil.h > zutil.h.tmp
+        mv zutil.h.tmp zutil.h
+    fi
     ./configure --prefix="$stage" --static
     make -j"$jobs"
     make install

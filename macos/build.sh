@@ -51,6 +51,7 @@ for archive in djvulibre-3.5.29 jpegsrc.v6b tiff-4.0.10 zlib-1.2.11; do
     cp "$project_root/windows/third-party/$archive.tar.gz" "$work/input/third-party/"
 done
 cp "$project_root/windows/third-party/SHA256SUMS.txt" "$work/input/third-party/"
+cp "$project_root/macos/scripts/build-djvu.sh" "$work/input/third-party/"
 jlink --add-modules java.base,java.desktop,java.sql,java.logging,java.naming,java.net.http,java.management,jdk.crypto.ec,jdk.unsupported,jdk.charsets,jdk.localedata \
     --strip-debug --no-header-files --no-man-pages --compress=2 --output "$work/runtime"
 jpackage --type app-image --name Readerka --app-version "$version" --vendor Readerka \
